@@ -1,3 +1,7 @@
+split:
+  holdout_every: 5
+  holdout_offset: 0
+
 scenario_families:
   lead_brake:
     ego_speed_mps: [18, 25, 32]
@@ -12,4 +16,3 @@ scenario_families:
     cut_in_relative_speed_mps: [-8, -4, 0]
     road_friction: ["dry", "wet"]
     sensor_confidence_profile: ["stable", "dropout", "noisy"]
-

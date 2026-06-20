@@ -55,7 +55,12 @@ def main() -> None:
 def _generate_scenarios(args: argparse.Namespace) -> None:
     scenarios = generate_scenarios_from_yaml(args.config)
     write_scenarios_jsonl(scenarios, args.out)
-    print(f"generated_scenarios={len(scenarios)} out={args.out}")
+    train_count = sum(1 for scenario in scenarios if scenario.split == "train")
+    holdout_count = sum(1 for scenario in scenarios if scenario.split == "holdout")
+    print(
+        f"generated_scenarios={len(scenarios)} train={train_count} "
+        f"holdout={holdout_count} out={args.out}"
+    )
 
 
 def _run_baseline(args: argparse.Namespace) -> None:
@@ -83,10 +88,16 @@ def _repair(args: argparse.Namespace) -> None:
 def _evaluate_candidates(args: argparse.Namespace) -> None:
     scenarios = read_scenarios_jsonl(args.scenarios)
     result = evaluate_candidates(args.candidates, scenarios, args.out)
-    best = sorted(result["candidates"], key=lambda item: item["score"]["score"])[0]
+    best = sorted(
+        result["candidates"],
+        key=lambda item: item["split_results"]["train"]["score"]["total_score"],
+    )[0]
     print(
-        f"baseline_score={result['baseline']['score']['score']} "
-        f"best_patch={best['patch_id']} best_score={best['score']['score']} "
+        f"baseline_train_total={result['baseline']['train']['score']['total_score']} "
+        f"baseline_holdout_total={result['baseline']['holdout']['score']['total_score']} "
+        f"best_patch={best['patch_id']} "
+        f"best_train_total={best['split_results']['train']['score']['total_score']} "
+        f"best_holdout_total={best['split_results']['holdout']['score']['total_score']} "
         f"improvement_pct={best['improvement_pct']} out={args.out}"
     )
 

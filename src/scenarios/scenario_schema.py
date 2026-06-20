@@ -19,6 +19,7 @@ class Scenario:
     duration_s: float = 12.0
     dt_s: float = 0.1
     seed: int = 0
+    split: str = "train"
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -45,5 +46,5 @@ class Scenario:
             duration_s=float(data.get("duration_s", 12.0)),
             dt_s=float(data.get("dt_s", 0.1)),
             seed=int(data.get("seed", 0)),
+            split=str(data.get("split", "train")),
         )
-

@@ -32,7 +32,7 @@ def evaluate_trace_rows(rows: list[dict], supervisor_config: dict[str, Any] | No
     events, annotated = monitor.evaluate(rows)
     grouped_runs = {row["run_id"] for row in annotated}
     failing_runs = {event.run_id for event in events}
-    score = score_events(events)
+    score = score_events(events, annotated)
     invariant = (
         check_graph_invariants(supervisor_config).to_dict()
         if supervisor_config is not None
@@ -65,49 +65,88 @@ def evaluate_candidates(
     baseline_supervisor_path = Path(manifest.get("source_supervisor") or "configs/baseline_supervisor.yaml")
     baseline_rows = read_jsonl(baseline_trace_path)
     baseline_config = load_yaml(baseline_supervisor_path)
-    baseline_result = evaluate_trace_rows(baseline_rows, baseline_config)
-    baseline_score = baseline_result["score"]["score"]
+    baseline_rows_by_split = split_trace_rows(baseline_rows, scenarios)
+    baseline_results = {
+        split: evaluate_trace_rows(rows, baseline_config)
+        for split, rows in baseline_rows_by_split.items()
+    }
+    baseline_results["all"] = evaluate_trace_rows(baseline_rows, baseline_config)
+    baseline_train_score = baseline_results["train"]["score"]["total_score"]
 
     candidate_results: list[dict[str, Any]] = []
     best_config: dict[str, Any] | None = None
-    best_score: int | None = None
+    best_train_score: int | None = None
     for candidate in manifest["candidates"]:
         path = candidates_path / candidate["path"]
         config = load_yaml(path)
         rows = run_supervisor_on_scenarios(config, scenarios, candidate["patch_id"])
-        result = evaluate_trace_rows(rows, config)
-        score = result["score"]["score"]
+        rows_by_split = split_trace_rows(rows, scenarios)
+        split_results = {
+            split: _without_annotated_rows(evaluate_trace_rows(split_rows, config))
+            for split, split_rows in rows_by_split.items()
+        }
+        split_results["all"] = _without_annotated_rows(evaluate_trace_rows(rows, config))
+        train_score = split_results["train"]["score"]["total_score"]
         improvement_pct = 0.0
-        if baseline_score > 0:
-            improvement_pct = round(100.0 * (baseline_score - score) / baseline_score, 2)
+        if baseline_train_score > 0:
+            improvement_pct = round(100.0 * (baseline_train_score - train_score) / baseline_train_score, 2)
+
         candidate_result = {
             "patch_id": candidate["patch_id"],
             "description": candidate["description"],
             "mutation_type": candidate["mutation_type"],
             "path": str(path),
-            "score": result["score"],
-            "violation_counts": result["violation_counts"],
-            "events": result["events"],
-            "failure_rate": result["failure_rate"],
-            "failing_run_count": result["failing_run_count"],
-            "run_count": result["run_count"],
-            "invariant_check": result["invariant_check"],
+            "split_results": split_results,
+            "score": split_results["train"]["score"],
+            "violation_counts": split_results["train"]["violation_counts"],
+            "events": split_results["train"]["events"],
+            "failure_rate": split_results["train"]["failure_rate"],
+            "failing_run_count": split_results["train"]["failing_run_count"],
+            "run_count": split_results["train"]["run_count"],
+            "invariant_check": split_results["train"]["invariant_check"],
             "improvement_pct": improvement_pct,
         }
         candidate_results.append(candidate_result)
-        if best_score is None or score < best_score:
-            best_score = score
+        if best_train_score is None or train_score < best_train_score:
+            best_train_score = train_score
             best_config = config
 
     if best_config is None:
         best_config = baseline_config
-    write_report(out_dir, baseline_result, candidate_results, baseline_result["annotated_rows"], best_config)
+    baseline_annotated_rows_by_split = {
+        split: result["annotated_rows"]
+        for split, result in baseline_results.items()
+        if split in {"train", "holdout"}
+    }
+    write_report(out_dir, baseline_results, candidate_results, baseline_annotated_rows_by_split, best_config)
     return {
         "baseline": {
-            key: value
-            for key, value in baseline_result.items()
-            if key != "annotated_rows"
+            split: _without_annotated_rows(result)
+            for split, result in baseline_results.items()
         },
         "candidates": candidate_results,
     }
 
+
+def split_scenarios(scenarios: list[Scenario]) -> dict[str, list[Scenario]]:
+    splits: dict[str, list[Scenario]] = {"train": [], "holdout": []}
+    for scenario in scenarios:
+        splits.setdefault(scenario.split, []).append(scenario)
+    return splits
+
+
+def split_trace_rows(rows: list[dict], scenarios: list[Scenario]) -> dict[str, list[dict]]:
+    split_by_scenario = {scenario.scenario_id: scenario.split for scenario in scenarios}
+    splits: dict[str, list[dict]] = {"train": [], "holdout": []}
+    for row in rows:
+        split = split_by_scenario.get(row["scenario_id"], "train")
+        splits.setdefault(split, []).append(row)
+    return splits
+
+
+def _without_annotated_rows(result: dict[str, Any]) -> dict[str, Any]:
+    return {
+        key: value
+        for key, value in result.items()
+        if key != "annotated_rows"
+    }

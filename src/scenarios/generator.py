@@ -17,6 +17,9 @@ def _as_list(value: Any) -> list[Any]:
 
 def generate_scenarios(config: dict[str, Any]) -> list[Scenario]:
     families = config.get("scenario_families") or {}
+    split_config = config.get("split") or {}
+    holdout_every = int(split_config.get("holdout_every", 5))
+    holdout_offset = int(split_config.get("holdout_offset", 0))
     scenarios: list[Scenario] = []
     index = 0
 
@@ -42,6 +45,7 @@ def generate_scenarios(config: dict[str, Any]) -> list[Scenario]:
                     driver_takeover_delay_s=float(params["driver_takeover_delay_s"]),
                     road_friction="dry",
                     seed=index,
+                    split=_split_for_index(index, holdout_every, holdout_offset),
                 )
             )
             index += 1
@@ -74,11 +78,18 @@ def generate_scenarios(config: dict[str, Any]) -> list[Scenario]:
                     cut_in_relative_speed_mps=rel_speed,
                     road_friction=friction,
                     seed=index,
+                    split=_split_for_index(index, holdout_every, holdout_offset),
                 )
             )
             index += 1
 
     return scenarios
+
+
+def _split_for_index(index: int, holdout_every: int, holdout_offset: int) -> str:
+    if holdout_every <= 1:
+        return "holdout"
+    return "holdout" if index % holdout_every == holdout_offset else "train"
 
 
 def generate_scenarios_from_yaml(path: str | Path) -> list[Scenario]:
@@ -102,4 +113,3 @@ def read_scenarios_jsonl(path: str | Path) -> list[Scenario]:
                 continue
             scenarios.append(Scenario.from_dict(json.loads(line)))
     return scenarios
-

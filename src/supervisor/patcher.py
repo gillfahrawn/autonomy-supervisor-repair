@@ -60,10 +60,12 @@ def _append_transition(config: dict[str, Any], name: str, source: str, target: s
 
 
 def _add_hysteresis(config: dict[str, Any], low: float = 0.40, high: float = 0.55, hold_s: float = 0.8) -> None:
+    enter_source = "FOLLOWING_UNCERTAIN" if "FOLLOWING_UNCERTAIN" in config.get("states", []) else "FOLLOWING"
+    exit_target = "FOLLOWING_STABLE" if "FOLLOWING_STABLE" in config.get("states", []) else "FOLLOWING"
     _append_transition(
         config,
         "following_to_degraded_hysteresis_enter",
-        "FOLLOWING",
+        enter_source,
         "DEGRADED_PERCEPTION",
         f"sensor_confidence < {low:.2f}",
     )
@@ -71,7 +73,7 @@ def _add_hysteresis(config: dict[str, Any], low: float = 0.40, high: float = 0.5
         config,
         "degraded_to_following_hysteresis_exit",
         "DEGRADED_PERCEPTION",
-        "FOLLOWING",
+        exit_target,
         f"sensor_confidence > {high:.2f} and duration_s > {hold_s:.2f}",
     )
     _set_transition_condition(
@@ -103,6 +105,23 @@ def _add_recovery_constraints(config: dict[str, Any], takeover_ttc_threshold: fl
         "TAKEOVER_REQUESTED",
         "MIN_RISK_MANEUVER",
         f"ttc_s < {takeover_ttc_threshold:.2f}",
+    )
+
+
+def _apply_relative_velocity_guard(config: dict[str, Any], threshold: float = 1.80) -> None:
+    _set_transition_condition(
+        config,
+        "following_to_mrm",
+        f"ttc_s < {threshold:.2f} and relative_velocity_mps > 0.10",
+    )
+
+
+def _apply_cut_in_specific_guard(config: dict[str, Any]) -> None:
+    _set_transition_condition(
+        config,
+        "following_to_mrm",
+        "(cut_in_active and ttc_s < 2.50) or "
+        "(not cut_in_active and relative_velocity_mps > 0.10 and ttc_s < 1.80)",
     )
 
 
@@ -201,10 +220,19 @@ def generate_candidate_patches(supervisor: dict[str, Any]) -> list[CandidatePatc
         supervisor,
         "candidate_guarded_mrm",
         "Raise TTC response to 1.80s but require the ego vehicle to be closing.",
-        "transition_guard_addition",
+        "relative_velocity_guard",
     )
-    _set_transition_condition(cfg, "following_to_mrm", "ttc_s < 1.80 and relative_velocity_mps > 0.10")
-    add(cfg["metadata"]["patch_id"], cfg["metadata"]["description"], "transition_guard_addition", cfg)
+    _apply_relative_velocity_guard(cfg)
+    add(cfg["metadata"]["patch_id"], cfg["metadata"]["description"], "relative_velocity_guard", cfg)
+
+    cfg = _with_metadata(
+        supervisor,
+        "candidate_cut_in_specific_guard",
+        "Use a 2.50s TTC threshold during active cut-ins and a closing-speed guard otherwise.",
+        "cut_in_specific_guard",
+    )
+    _apply_cut_in_specific_guard(cfg)
+    add(cfg["metadata"]["patch_id"], cfg["metadata"]["description"], "cut_in_specific_guard", cfg)
 
     cfg = _with_metadata(
         supervisor,
@@ -228,6 +256,19 @@ def generate_candidate_patches(supervisor: dict[str, Any]) -> list[CandidatePatc
 
     cfg = _with_metadata(
         supervisor,
+        "candidate_architectural_combo",
+        "Combine FOLLOWING split, confidence hysteresis, relative/cut-in TTC guard, and recovery constraints.",
+        "architectural_combo",
+    )
+    _split_following(cfg)
+    _apply_cut_in_specific_guard(cfg)
+    _set_transition_condition(cfg, "following_to_takeover", "sensor_confidence < 0.40")
+    _add_hysteresis(cfg)
+    _add_recovery_constraints(cfg, takeover_ttc_threshold=2.50)
+    add(cfg["metadata"]["patch_id"], cfg["metadata"]["description"], "architectural_combo", cfg)
+
+    cfg = _with_metadata(
+        supervisor,
         "candidate_full_mvp_repair",
         "Combine 2.50s TTC response, sensor takeover threshold, degraded hysteresis, and safe-stop recovery.",
         "combined",
@@ -235,7 +276,7 @@ def generate_candidate_patches(supervisor: dict[str, Any]) -> list[CandidatePatc
     _set_transition_condition(cfg, "following_to_mrm", "ttc_s < 2.50")
     _set_transition_condition(cfg, "following_to_takeover", "sensor_confidence < 0.40")
     _add_hysteresis(cfg)
-    _add_recovery_constraints(cfg)
+    _add_recovery_constraints(cfg, takeover_ttc_threshold=2.50)
     add(cfg["metadata"]["patch_id"], cfg["metadata"]["description"], "combined", cfg)
 
     return candidates
