@@ -6,6 +6,7 @@ import shutil
 from pathlib import Path
 from typing import Any
 
+from src.evaluation.selection import SELECTION_CRITERION, rank_candidates_for_selection
 from src.supervisor.schemas import dump_yaml
 from src.traces.io import group_by_run, write_csv
 from src.verification.stl_properties import PROPERTY_DESCRIPTIONS
@@ -46,6 +47,7 @@ def write_report(
     top_failures = _write_minimized_counterexamples(out, baseline_results, baseline_rows_by_split)
 
     summary = {
+        "selection_criterion": SELECTION_CRITERION,
         "baseline": {
             "train": _summary_result(baseline_train),
             "holdout": _summary_result(baseline_holdout),
@@ -60,13 +62,14 @@ def write_report(
                 "train_improvement_pct": train_improvement_pct,
                 "holdout_improvement_pct": holdout_improvement_pct,
                 "invariant_check": best["invariant_check"],
+                "passes_invariant_checks": best["invariant_check"]["passed"],
             }
             if best
             else None
         ),
         "candidate_rankings": [
             {
-                "rank": index + 1,
+                "selection_rank": index + 1,
                 "patch_id": candidate["patch_id"],
                 "train_safety_score": candidate["split_results"]["train"]["score"]["safety_score"],
                 "train_utility_penalty": candidate["split_results"]["train"]["score"]["utility_penalty"],
@@ -99,14 +102,7 @@ def write_report(
 
 
 def _rank_candidates(candidate_results: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    return sorted(
-        candidate_results,
-        key=lambda item: (
-            item["split_results"]["train"]["score"]["total_score"],
-            item["split_results"]["holdout"]["score"]["total_score"],
-            item["patch_id"],
-        ),
-    )
+    return rank_candidates_for_selection(candidate_results)
 
 
 def _summary_result(result: dict[str, Any]) -> dict[str, Any]:
@@ -131,7 +127,7 @@ def _write_before_after(
     ranked: list[dict[str, Any]],
 ) -> None:
     fieldnames = [
-        "rank",
+        "selection_rank",
         "patch_id",
         "train_safety_score",
         "train_utility_penalty",
@@ -162,7 +158,7 @@ def _write_before_after(
             holdout_score = candidate["split_results"]["holdout"]["score"]
             writer.writerow(
                 {
-                    "rank": index,
+                    "selection_rank": index,
                     "patch_id": candidate["patch_id"],
                     "train_safety_score": train_score["safety_score"],
                     "train_utility_penalty": train_score["utility_penalty"],
@@ -378,6 +374,10 @@ def _write_index(
     lines = [
         "# Counterexample-Guided Supervisor Repair Report",
         "",
+        "**This demo validates the repair loop, not vehicle safety.**",
+        "",
+        "This is a SIL-first toy simulator report with formal-tool-compatible invariant checks.",
+        "",
         "## Baseline Train/Holdout",
         "",
         "| Split | Runs | Failing Runs | Failure Rate | Safety Score | Utility Penalty | Total Score |",
@@ -385,9 +385,13 @@ def _write_index(
         _score_row("train", baseline_train),
         _score_row("holdout", baseline_holdout),
         "",
+        "## Selection Criterion",
+        "",
+        SELECTION_CRITERION,
+        "",
         "## Candidate Rankings",
         "",
-        "| Rank | Patch | Train Total | Holdout Total | Train Safety | Train Utility | Holdout Safety | Holdout Utility |",
+        "| Selection Rank | Patch | Train Total | Holdout Total | Train Safety | Train Utility | Holdout Safety | Holdout Utility |",
         "| ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: |",
     ]
     for index, candidate in enumerate(ranked, start=1):
@@ -428,11 +432,21 @@ def _write_index(
                 f"- Holdout improvement: {holdout_improvement_pct:.2f}%",
                 f"- Train safety/utility/total: {train['safety_score']} / {train['utility_penalty']} / {train['total_score']}",
                 f"- Holdout safety/utility/total: {holdout['safety_score']} / {holdout['utility_penalty']} / {holdout['total_score']}",
-                f"- Invariant check passed: {best['invariant_check']['passed']}",
+                f"- Formal-tool-compatible invariant checks passed: {best['invariant_check']['passed']}",
             ]
         )
         if best["invariant_check"]["failures"]:
-            lines.append(f"- Invariant failures: {best['invariant_check']['failures']}")
+            lines.append(
+                "- This patch is not reported as invariant-checked because failures remain: "
+                f"{best['invariant_check']['failures']}"
+            )
+        if best["invariant_check"].get("warnings"):
+            lines.append(f"- Invariant warnings: {best['invariant_check']['warnings']}")
+        if best["invariant_check"].get("unused_optional_states"):
+            lines.append(
+                "- Unused optional states: "
+                f"{best['invariant_check']['unused_optional_states']}"
+            )
 
     lines.extend(
         [
@@ -442,6 +456,12 @@ def _write_index(
             "- Safety score uses collision, critical TTC, sensor degradation, oscillation, and fake-safety property violations.",
             "- Utility penalty uses unnecessary emergency braking, unnecessary MRM activation, false takeover requests, average speed loss, mission completion, and average jerk proxy.",
             "- See `before_after.csv` and `pareto.csv` for complete candidate-level metrics.",
+            "",
+            "## Utility Interpretation",
+            "",
+            "- In this scenario set, utility differentiation is driven mostly by average speed loss, mission completion rate, and the jerk proxy.",
+            "- Unnecessary emergency braking, unnecessary MRM activation, and false takeover request counts remain zero for the selected candidate, so this run should not be read as broad fake-safety coverage.",
+            "- Those counters are retained as hooks for richer future scenarios where safe-context false positives are exercised directly.",
             "",
             "## Top 5 Minimized Counterexamples",
             "",
@@ -464,7 +484,7 @@ def _write_index(
             "",
             "## Limitations",
             "",
-            "- The MVP remains a deterministic 1D Python kinematic simulator, not CARLA.",
+            "- The MVP remains a deterministic SIL-first toy simulator, not CARLA.",
             "- CARLA, RTAMT, and nuXmv remain optional future adapter/export paths, not required dependencies.",
             "- Utility metrics are proxy measures intended for repair ranking, not validated vehicle comfort or mission KPIs.",
         ]

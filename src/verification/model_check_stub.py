@@ -15,6 +15,7 @@ DEGRADED_OR_FAILURE_STATES = {
     "EMERGENCY_BRAKE",
 }
 SAFE_TARGET_STATES = {"TAKEOVER_REQUESTED", "MIN_RISK_MANEUVER", "SAFE_STOP"}
+OPTIONAL_STATES = {"EMERGENCY_BRAKE"}
 
 
 @dataclass(frozen=True)
@@ -22,6 +23,8 @@ class InvariantCheckResult:
     passed: bool
     failures: list[str]
     reachable_states: list[str]
+    warnings: list[str]
+    unused_optional_states: list[str]
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -33,19 +36,35 @@ def check_graph_invariants(supervisor: dict[str, Any] | str | Path) -> Invariant
     initial = data.get("initial_state")
     transitions = list(data.get("transitions") or [])
     adjacency = {state: [] for state in states}
+    incoming = {state: [] for state in states}
     for transition in transitions:
-        adjacency.setdefault(transition.get("from"), []).append(transition.get("to"))
+        source = transition.get("from")
+        target = transition.get("to")
+        adjacency.setdefault(source, []).append(target)
+        incoming.setdefault(target, []).append(source)
 
     reachable = _reachable(adjacency, initial)
     failures: list[str] = []
+    warnings: list[str] = []
+    unused_optional_states = sorted(
+        state for state in OPTIONAL_STATES
+        if state in states and state not in reachable and not incoming.get(state)
+    )
+    if unused_optional_states:
+        warnings.append(
+            "Unused optional states with no incoming transitions: "
+            + ", ".join(unused_optional_states)
+        )
 
-    unreachable = sorted(set(states) - reachable)
+    unreachable = sorted((set(states) - reachable) - set(unused_optional_states))
     if unreachable:
         failures.append(f"Unreachable states from {initial}: {', '.join(unreachable)}")
 
     dead_ends = sorted(
         state for state in states
-        if state != "SAFE_STOP" and len(adjacency.get(state, [])) == 0
+        if state != "SAFE_STOP"
+        and state not in unused_optional_states
+        and len(adjacency.get(state, [])) == 0
     )
     if dead_ends:
         failures.append(f"Dead-end states other than SAFE_STOP: {', '.join(dead_ends)}")
@@ -54,6 +73,8 @@ def check_graph_invariants(supervisor: dict[str, Any] | str | Path) -> Invariant
         failures.append("Forbidden direct transition EMERGENCY_BRAKE -> CRUISE exists")
 
     for state in states:
+        if state in unused_optional_states:
+            continue
         if state in DEGRADED_OR_FAILURE_STATES or "DEGRADED" in state or "FAIL" in state:
             if state in SAFE_TARGET_STATES:
                 continue
@@ -67,6 +88,8 @@ def check_graph_invariants(supervisor: dict[str, Any] | str | Path) -> Invariant
         passed=not failures,
         failures=failures,
         reachable_states=sorted(reachable),
+        warnings=warnings,
+        unused_optional_states=unused_optional_states,
     )
 
 
@@ -84,4 +107,3 @@ def _reachable(adjacency: dict[str, list[str]], initial: str | None) -> set[str]
             if target not in seen:
                 queue.append(target)
     return seen
-

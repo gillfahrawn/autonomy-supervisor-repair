@@ -6,6 +6,7 @@ from typing import Any
 
 from src.evaluation.metrics import score_events
 from src.evaluation.report import write_report
+from src.evaluation.selection import rank_candidates_for_selection
 from src.scenarios.scenario_schema import Scenario
 from src.simulation.python_kinematic_sim import PythonKinematicSimulator
 from src.supervisor.schemas import load_yaml
@@ -75,7 +76,6 @@ def evaluate_candidates(
 
     candidate_results: list[dict[str, Any]] = []
     best_config: dict[str, Any] | None = None
-    best_train_score: int | None = None
     for candidate in manifest["candidates"]:
         path = candidates_path / candidate["path"]
         config = load_yaml(path)
@@ -107,9 +107,10 @@ def evaluate_candidates(
             "improvement_pct": improvement_pct,
         }
         candidate_results.append(candidate_result)
-        if best_train_score is None or train_score < best_train_score:
-            best_train_score = train_score
-            best_config = config
+
+    if candidate_results:
+        selected = rank_candidates_for_selection(candidate_results)[0]
+        best_config = load_yaml(selected["path"])
 
     if best_config is None:
         best_config = baseline_config

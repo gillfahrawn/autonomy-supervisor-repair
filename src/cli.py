@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 
 from src.evaluation.runner import evaluate_candidates, run_supervisor_on_scenarios
+from src.evaluation.selection import rank_candidates_for_selection
 from src.scenarios.generator import (
     generate_scenarios_from_yaml,
     read_scenarios_jsonl,
@@ -88,10 +89,7 @@ def _repair(args: argparse.Namespace) -> None:
 def _evaluate_candidates(args: argparse.Namespace) -> None:
     scenarios = read_scenarios_jsonl(args.scenarios)
     result = evaluate_candidates(args.candidates, scenarios, args.out)
-    best = sorted(
-        result["candidates"],
-        key=lambda item: item["split_results"]["train"]["score"]["total_score"],
-    )[0]
+    best = rank_candidates_for_selection(result["candidates"])[0]
     print(
         f"baseline_train_total={result['baseline']['train']['score']['total_score']} "
         f"baseline_holdout_total={result['baseline']['holdout']['score']['total_score']} "
