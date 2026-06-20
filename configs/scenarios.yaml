@@ -1,0 +1,15 @@
+scenario_families:
+  lead_brake:
+    ego_speed_mps: [18, 25, 32]
+    initial_gap_m: [15, 25, 40]
+    lead_decel_mps2: [-2.5, -5.0, -8.0]
+    sensor_confidence_profile: ["stable", "dropout", "noisy"]
+    driver_takeover_delay_s: [0.5, 1.5, 3.0]
+
+  cut_in:
+    ego_speed_mps: [18, 25, 32]
+    cut_in_gap_m: [8, 15, 25]
+    cut_in_relative_speed_mps: [-8, -4, 0]
+    road_friction: ["dry", "wet"]
+    sensor_confidence_profile: ["stable", "dropout", "noisy"]
+

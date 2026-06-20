@@ -1,0 +1,58 @@
+metadata:
+  patch_id: baseline
+  description: Baseline supervisor from the MVP context pack.
+states:
+  - CRUISE
+  - FOLLOWING
+  - DEGRADED_PERCEPTION
+  - TAKEOVER_REQUESTED
+  - MIN_RISK_MANEUVER
+  - EMERGENCY_BRAKE
+  - SAFE_STOP
+
+initial_state: CRUISE
+
+transitions:
+  - name: cruise_to_following
+    from: CRUISE
+    to: FOLLOWING
+    when: "lead_distance_m < 40 and ego_speed_mps > 5"
+
+  - name: following_to_mrm
+    from: FOLLOWING
+    to: MIN_RISK_MANEUVER
+    when: "ttc_s < 1.2"
+
+  - name: following_to_takeover
+    from: FOLLOWING
+    to: TAKEOVER_REQUESTED
+    when: "sensor_confidence < 0.30"
+
+  - name: degraded_to_takeover
+    from: DEGRADED_PERCEPTION
+    to: TAKEOVER_REQUESTED
+    when: "sensor_confidence < 0.40 and duration_s > 1.0"
+
+actions:
+  CRUISE:
+    brake_cmd: 0.0
+    target_accel_mps2: 0.5
+  FOLLOWING:
+    brake_cmd: 0.2
+    target_accel_mps2: 0.0
+  DEGRADED_PERCEPTION:
+    brake_cmd: 0.3
+    target_accel_mps2: -1.0
+  TAKEOVER_REQUESTED:
+    brake_cmd: 0.4
+    target_accel_mps2: -1.5
+  MIN_RISK_MANEUVER:
+    brake_cmd: 0.7
+    target_accel_mps2: -3.5
+  EMERGENCY_BRAKE:
+    brake_cmd: 1.0
+    target_accel_mps2: -7.0
+  SAFE_STOP:
+    brake_cmd: 1.0
+    target_accel_mps2: 0.0
+
