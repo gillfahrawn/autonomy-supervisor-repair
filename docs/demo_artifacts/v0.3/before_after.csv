@@ -1,0 +1,14 @@
+selection_rank,patch_id,selection_score,invariant_passed,train_safety_score,train_utility_penalty,train_total_score,holdout_safety_score,holdout_utility_penalty,holdout_total_score,benign_utility_penalty,benign_intervention_rate,benign_intervention_runs,benign_unnecessary_emergency_brakes,benign_unnecessary_mrm_activations,benign_false_takeover_requests,benign_avoidable_speed_loss_mps,benign_mission_completion_rate,train_improvement_pct,holdout_improvement_pct,train_collisions,holdout_collisions,train_unnecessary_mrm_activations,holdout_unnecessary_mrm_activations,train_false_takeover_requests,holdout_false_takeover_requests,train_average_speed_loss_mps,holdout_average_speed_loss_mps,train_mission_completion_rate,holdout_mission_completion_rate
+1,candidate_architectural_combo,64317,True,209300,14965,224265,50500,3727,54227,1009,0.0,0,0,0,0,1.8466,1.0,26.31,27.61,208,50,0,0,0,0,11.1072,11.0936,0.0432,0.0494
+2,candidate_full_mvp_repair,199612,True,202000,15266,217266,53000,3802,56802,12931,0.6923,54,0,54,0,8.841,0.3077,28.61,24.18,202,53,0,0,0,0,11.3009,11.2499,0.0216,0.0247
+3,candidate_cut_in_specific_guard,57966,False,216450,15313,231763,54150,3816,57966,0,0.0,0,0,0,0,0.0,1.0,23.85,22.62,216,54,0,0,0,0,11.1033,11.0309,0.0,0.0
+4,candidate_guarded_mrm,63975,False,237550,15148,252698,60200,3775,63975,0,0.0,0,0,0,0,0.0,1.0,16.97,14.6,237,60,0,0,0,0,10.8495,10.7783,0.0,0.0
+5,candidate_ttc_1_8,63975,False,237550,15148,252698,60200,3775,63975,0,0.0,0,0,0,0,0.0,1.0,16.97,14.6,237,60,0,0,0,0,10.8495,10.7783,0.0,0.0
+6,candidate_ttc_1_5,68972,False,259650,14932,274582,65250,3722,68972,0,0.0,0,0,0,0,0.0,1.0,9.78,7.93,259,65,0,0,0,0,10.5163,10.4468,0.0,0.0
+7,candidate_following_split,72822,False,234600,14513,249113,59100,3632,62732,1009,0.0,0,0,0,0,1.8466,1.0,18.15,16.26,230,58,0,0,0,0,10.5284,10.5151,0.0525,0.0494
+8,candidate_recovery_constraints,74910,False,289650,14688,304338,71250,3660,74910,0,0.0,0,0,0,0,0.0,1.0,0.0,0.0,289,71,0,0,0,0,10.1389,10.0665,0.0,0.0
+9,candidate_degraded_hysteresis,77337,False,298400,13859,312259,73900,3437,77337,0,0.0,0,0,0,0,0.0,1.0,-2.6,-3.24,291,72,0,0,0,0,9.1355,9.0055,0.0216,0.0247
+10,candidate_sensor_0_40,85266,False,304400,12790,317190,74200,3166,77366,640,0.0769,6,0,0,6,0.3701,1.0,-4.22,-3.28,287,70,0,0,0,0,8.1094,8.1066,0.071,0.0864
+11,candidate_ttc_2_1,131896,False,223100,15350,238450,56050,3826,59876,6527,0.3462,27,0,27,0,4.5342,0.6538,21.65,20.07,223,56,0,0,0,0,11.161,11.0923,0.0,0.0
+12,candidate_ttc_2_5,195788,False,194100,15556,209656,49050,3878,52928,12936,0.6923,54,0,54,0,8.851,0.3077,31.11,29.35,194,49,0,0,0,0,11.4781,11.4077,0.0,0.0
+13,candidate_combined_ttc_sensor,215699,False,241100,13601,254701,61600,3339,64939,13576,0.7692,60,0,54,6,9.2211,0.3077,16.31,13.31,227,58,0,0,0,0,9.3589,9.1709,0.071,0.0864

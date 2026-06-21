@@ -1,0 +1,14 @@
+pareto_rank,patch_id,selection_score,train_safety_score,train_utility_penalty,train_total_score,holdout_safety_score,holdout_utility_penalty,holdout_total_score,benign_utility_penalty,benign_intervention_rate,pareto_front,dominated_by
+1,candidate_ttc_2_5,195788,194100,15556,209656,49050,3878,52928,12936,0.6923,True,
+2,candidate_full_mvp_repair,199612,202000,15266,217266,53000,3802,56802,12931,0.6923,True,
+3,candidate_architectural_combo,64317,209300,14965,224265,50500,3727,54227,1009,0.0,True,
+4,candidate_following_split,72822,234600,14513,249113,59100,3632,62732,1009,0.0,True,
+5,candidate_combined_ttc_sensor,215699,241100,13601,254701,61600,3339,64939,13576,0.7692,True,
+6,candidate_sensor_0_40,85266,304400,12790,317190,74200,3166,77366,640,0.0769,True,
+7,candidate_cut_in_specific_guard,57966,216450,15313,231763,54150,3816,57966,0,0.0,False,candidate_architectural_combo|candidate_full_mvp_repair
+8,candidate_ttc_2_1,131896,223100,15350,238450,56050,3826,59876,6527,0.3462,False,candidate_architectural_combo|candidate_full_mvp_repair|candidate_cut_in_specific_guard
+9,candidate_guarded_mrm,63975,237550,15148,252698,60200,3775,63975,0,0.0,False,candidate_architectural_combo|candidate_following_split
+10,candidate_ttc_1_8,63975,237550,15148,252698,60200,3775,63975,0,0.0,False,candidate_architectural_combo|candidate_following_split
+11,candidate_ttc_1_5,68972,259650,14932,274582,65250,3722,68972,0,0.0,False,candidate_following_split|candidate_combined_ttc_sensor
+12,candidate_recovery_constraints,74910,289650,14688,304338,71250,3660,74910,0,0.0,False,candidate_following_split|candidate_combined_ttc_sensor
+13,candidate_degraded_hysteresis,77337,298400,13859,312259,73900,3437,77337,0,0.0,False,candidate_combined_ttc_sensor

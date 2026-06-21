@@ -1,0 +1,86 @@
+metadata:
+  patch_id: candidate_architectural_combo
+  description: Combine FOLLOWING split, confidence hysteresis, relative/cut-in TTC
+    guard, and recovery constraints.
+  mutation_type: architectural_combo
+states:
+- CRUISE
+- FOLLOWING_STABLE
+- FOLLOWING_UNCERTAIN
+- DEGRADED_PERCEPTION
+- TAKEOVER_REQUESTED
+- MIN_RISK_MANEUVER
+- EMERGENCY_BRAKE
+- SAFE_STOP
+initial_state: CRUISE
+transitions:
+- name: cruise_to_following_stable
+  from: CRUISE
+  to: FOLLOWING_STABLE
+  when: lead_distance_m < 40 and ego_speed_mps > 5
+- name: following_to_mrm
+  from: FOLLOWING_UNCERTAIN
+  to: MIN_RISK_MANEUVER
+  when: (cut_in_active and relative_velocity_mps > 1.00 and ttc_s < 2.50) or (not
+    cut_in_active and relative_velocity_mps > 0.10 and ttc_s < 1.80)
+- name: following_to_takeover
+  from: FOLLOWING_UNCERTAIN
+  to: TAKEOVER_REQUESTED
+  when: sensor_confidence < 0.40 and low_confidence_duration_s > 1.00
+- name: degraded_to_takeover
+  from: DEGRADED_PERCEPTION
+  to: TAKEOVER_REQUESTED
+  when: sensor_confidence < 0.40 and duration_s > 1.00
+- name: following_stable_to_uncertain
+  from: FOLLOWING_STABLE
+  to: FOLLOWING_UNCERTAIN
+  when: lead_distance_m < 30 or sensor_confidence < 0.50
+- name: following_uncertain_to_stable
+  from: FOLLOWING_UNCERTAIN
+  to: FOLLOWING_STABLE
+  when: lead_distance_m >= 30 and sensor_confidence > 0.65 and duration_s > 1.00
+- name: following_to_degraded_hysteresis_enter
+  from: FOLLOWING_UNCERTAIN
+  to: DEGRADED_PERCEPTION
+  when: sensor_confidence < 0.40 and low_confidence_duration_s > 0.50
+- name: degraded_to_following_hysteresis_exit
+  from: DEGRADED_PERCEPTION
+  to: FOLLOWING_STABLE
+  when: sensor_confidence > 0.55 and duration_s > 0.80
+- name: mrm_to_safe_stop
+  from: MIN_RISK_MANEUVER
+  to: SAFE_STOP
+  when: ego_speed_mps < 0.20
+- name: emergency_to_safe_stop
+  from: EMERGENCY_BRAKE
+  to: SAFE_STOP
+  when: ego_speed_mps < 0.20
+- name: takeover_to_mrm_if_ttc_critical
+  from: TAKEOVER_REQUESTED
+  to: MIN_RISK_MANEUVER
+  when: ttc_s < 2.50
+actions:
+  CRUISE:
+    brake_cmd: 0.0
+    target_accel_mps2: 0.5
+  DEGRADED_PERCEPTION:
+    brake_cmd: 0.3
+    target_accel_mps2: -1.0
+  TAKEOVER_REQUESTED:
+    brake_cmd: 0.4
+    target_accel_mps2: -1.5
+  MIN_RISK_MANEUVER:
+    brake_cmd: 0.7
+    target_accel_mps2: -3.5
+  EMERGENCY_BRAKE:
+    brake_cmd: 1.0
+    target_accel_mps2: -7.0
+  SAFE_STOP:
+    brake_cmd: 1.0
+    target_accel_mps2: 0.0
+  FOLLOWING_STABLE:
+    brake_cmd: 0.2
+    target_accel_mps2: 0.0
+  FOLLOWING_UNCERTAIN:
+    brake_cmd: 0.3
+    target_accel_mps2: -0.8

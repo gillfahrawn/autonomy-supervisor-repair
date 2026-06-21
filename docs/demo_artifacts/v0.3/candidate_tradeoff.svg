@@ -1,0 +1,61 @@
+<svg xmlns='http://www.w3.org/2000/svg' width='980' height='620' viewBox='0 0 980 620' role='img' aria-labelledby='title desc'>
+<title id='title'>Candidate tradeoff: dangerous holdout score vs benign intervention rate</title>
+<desc id='desc'>Scatter plot of candidate patches. Lower-left is better. The selected patch has zero benign intervention rate while aggressive rejected patches overfire.</desc>
+<rect width='100%' height='100%' fill='white'/>
+<text x='96' y='28' font-family='Arial, sans-serif' font-size='20' font-weight='700'>Candidate Tradeoff</text>
+<text x='96' y='48' font-family='Arial, sans-serif' font-size='13' fill='#555'>x: dangerous holdout total score (lower is better); y: benign intervention rate (lower is better)</text>
+<line x1='96' y1='50.0' x2='942' y2='50.0' stroke='#e6e6e6'/>
+<text x='84' y='54.0' text-anchor='end' font-family='Arial, sans-serif' font-size='12' fill='#555'>83%</text>
+<line x1='96' y1='168.5' x2='942' y2='168.5' stroke='#e6e6e6'/>
+<text x='84' y='172.5' text-anchor='end' font-family='Arial, sans-serif' font-size='12' fill='#555'>62%</text>
+<line x1='96' y1='287.0' x2='942' y2='287.0' stroke='#e6e6e6'/>
+<text x='84' y='291.0' text-anchor='end' font-family='Arial, sans-serif' font-size='12' fill='#555'>41%</text>
+<line x1='96' y1='405.5' x2='942' y2='405.5' stroke='#e6e6e6'/>
+<text x='84' y='409.5' text-anchor='end' font-family='Arial, sans-serif' font-size='12' fill='#555'>21%</text>
+<line x1='96' y1='524.0' x2='942' y2='524.0' stroke='#e6e6e6'/>
+<text x='84' y='528.0' text-anchor='end' font-family='Arial, sans-serif' font-size='12' fill='#555'>0%</text>
+<line x1='96.0' y1='50' x2='96.0' y2='524' stroke='#f0f0f0'/>
+<text x='96.0' y='546' text-anchor='middle' font-family='Arial, sans-serif' font-size='12' fill='#555'>50,973</text>
+<line x1='265.2' y1='50' x2='265.2' y2='524' stroke='#f0f0f0'/>
+<text x='265.2' y='546' text-anchor='middle' font-family='Arial, sans-serif' font-size='12' fill='#555'>56,643</text>
+<line x1='434.4' y1='50' x2='434.4' y2='524' stroke='#f0f0f0'/>
+<text x='434.4' y='546' text-anchor='middle' font-family='Arial, sans-serif' font-size='12' fill='#555'>62,312</text>
+<line x1='603.6' y1='50' x2='603.6' y2='524' stroke='#f0f0f0'/>
+<text x='603.6' y='546' text-anchor='middle' font-family='Arial, sans-serif' font-size='12' fill='#555'>67,982</text>
+<line x1='772.8' y1='50' x2='772.8' y2='524' stroke='#f0f0f0'/>
+<text x='772.8' y='546' text-anchor='middle' font-family='Arial, sans-serif' font-size='12' fill='#555'>73,651</text>
+<line x1='942.0' y1='50' x2='942.0' y2='524' stroke='#f0f0f0'/>
+<text x='942.0' y='546' text-anchor='middle' font-family='Arial, sans-serif' font-size='12' fill='#555'>79,321</text>
+<line x1='96' y1='524' x2='942' y2='524' stroke='#333' stroke-width='1.3'/>
+<line x1='96' y1='50' x2='96' y2='524' stroke='#333' stroke-width='1.3'/>
+<text x='519.0' y='588' text-anchor='middle' font-family='Arial, sans-serif' font-size='14'>Dangerous holdout total score</text>
+<text transform='translate(26 287.0) rotate(-90)' text-anchor='middle' font-family='Arial, sans-serif' font-size='14'>Benign intervention rate</text>
+<circle cx='154.3' cy='128.3' r='7' fill='#d95f02' opacity='1.0' stroke='white' stroke-width='1.5'/>
+<circle cx='193.1' cy='524.0' r='8' fill='#1b9e77' opacity='1.0' stroke='white' stroke-width='1.5'/>
+<circle cx='270.0' cy='128.3' r='7' fill='#d95f02' opacity='1.0' stroke='white' stroke-width='1.5'/>
+<circle cx='304.7' cy='524.0' r='5' fill='#7a7a7a' opacity='0.72' stroke='white' stroke-width='1.5'/>
+<circle cx='361.7' cy='326.1' r='5' fill='#7a7a7a' opacity='0.72' stroke='white' stroke-width='1.5'/>
+<circle cx='446.9' cy='524.0' r='5' fill='#7a7a7a' opacity='0.72' stroke='white' stroke-width='1.5'/>
+<circle cx='484.0' cy='524.0' r='5' fill='#7a7a7a' opacity='0.72' stroke='white' stroke-width='1.5'/>
+<circle cx='484.0' cy='524.0' r='5' fill='#7a7a7a' opacity='0.72' stroke='white' stroke-width='1.5'/>
+<circle cx='512.8' cy='84.3' r='7' fill='#d95f02' opacity='1.0' stroke='white' stroke-width='1.5'/>
+<circle cx='633.2' cy='524.0' r='5' fill='#7a7a7a' opacity='0.72' stroke='white' stroke-width='1.5'/>
+<circle cx='810.4' cy='524.0' r='5' fill='#7a7a7a' opacity='0.72' stroke='white' stroke-width='1.5'/>
+<circle cx='882.8' cy='524.0' r='5' fill='#7a7a7a' opacity='0.72' stroke='white' stroke-width='1.5'/>
+<circle cx='883.7' cy='480.0' r='5' fill='#7a7a7a' opacity='0.72' stroke='white' stroke-width='1.5'/>
+<line x1='193.1' y1='524.0' x2='203.1' y2='502.0' stroke='#0f6f54' stroke-width='1'/>
+<text x='207.1' y='506.0' font-family='Arial, sans-serif' font-size='12' fill='#0f6f54'>candidate_architectural_combo: 54,227, 0.00%</text>
+<line x1='270.0' y1='128.3' x2='280.0' y2='152.3' stroke='#a34200' stroke-width='1'/>
+<text x='284.0' y='156.3' font-family='Arial, sans-serif' font-size='12' fill='#a34200'>candidate_full_mvp_repair: 56,802, 69.23%</text>
+<line x1='154.3' y1='128.3' x2='164.3' y2='106.3' stroke='#a34200' stroke-width='1'/>
+<text x='168.3' y='110.3' font-family='Arial, sans-serif' font-size='12' fill='#a34200'>candidate_ttc_2_5: 52,928, 69.23%</text>
+<line x1='512.8' y1='84.3' x2='290.8' y2='62.3' stroke='#a34200' stroke-width='1'/>
+<text x='286.8' y='66.3' font-family='Arial, sans-serif' font-size='12' fill='#a34200'>candidate_combined_ttc_sensor: 64,939, 76.92%</text>
+<rect x='670' y='72' width='270' height='78' rx='6' fill='#fafafa' stroke='#ddd'/>
+<circle cx='688' cy='96' r='7' fill='#1b9e77'/>
+<text x='704' y='100' font-family='Arial, sans-serif' font-size='12'>Selected patch</text>
+<circle cx='688' cy='120' r='7' fill='#d95f02'/>
+<text x='704' y='124' font-family='Arial, sans-serif' font-size='12'>Rejected aggressive candidates</text>
+<circle cx='688' cy='138' r='5' fill='#7a7a7a' opacity='0.72'/>
+<text x='704' y='142' font-family='Arial, sans-serif' font-size='12'>Other candidates</text>
+</svg>

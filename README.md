@@ -11,7 +11,7 @@ python3 -m pytest
 make demo
 ```
 
-`make demo` regenerates scenarios, traces, candidate patches, verification outputs, and the latest report under `reports/latest/`.
+`make demo` regenerates scenarios, traces, candidate patches, verification outputs, and the latest report under `reports/latest/`. That directory is gitignored generated output; the committed v0.3 artifact snapshot linked below lives under `docs/demo_artifacts/v0.3/`.
 
 ## Current Demo Result
 
@@ -69,22 +69,23 @@ More aggressive candidates reduce some dangerous scores but overfire in benign c
 | `candidate_combined_ttc_sensor` | 64939 | 76.92% | Combines dangerous-case changes with the highest benign overfire rate |
 | `candidate_architectural_combo` | 54227 | 0.00% | Selected: meaningful holdout gain without benign interventions |
 
-![Candidate tradeoff chart](reports/latest/figures/candidate_tradeoff.svg)
+![Candidate tradeoff chart](docs/demo_artifacts/v0.3/candidate_tradeoff.svg)
 
 One rejected fake-safety example:
 
-- CSV: [candidate_ttc_2_5 benign close-following false positive](reports/latest/rejected_candidate_false_positives/candidate_ttc_2_5_1_candidate_ttc_2_5__benign_close_following_0000.csv)
-- Trace plot: [candidate_ttc_2_5 rejected trace plot](reports/latest/trace_plots/rejected_candidate_ttc_2_5_1_candidate_ttc_2_5__benign_close_following_0000.svg)
+- CSV: [candidate_ttc_2_5 benign close-following false positive](docs/demo_artifacts/v0.3/rejected_ttc_2_5_false_positive.csv)
+- Trace plot: [candidate_ttc_2_5 rejected trace plot](docs/demo_artifacts/v0.3/rejected_ttc_2_5_false_positive.svg)
 
 ## Report Artifacts
 
-- [Latest report](reports/latest/index.md)
-- [Summary JSON](reports/latest/summary.json)
-- [Before/after metrics](reports/latest/before_after.csv)
-- [Pareto table](reports/latest/pareto.csv)
-- [Best patch YAML](reports/latest/best_patch.yaml)
-- [Rejected candidate false positives](reports/latest/rejected_candidate_false_positives/)
-- [Candidate tradeoff chart](reports/latest/figures/candidate_tradeoff.svg)
+- [Latest report snapshot](docs/demo_artifacts/v0.3/index.md)
+- [Summary JSON snapshot](docs/demo_artifacts/v0.3/summary.json)
+- [Before/after metrics snapshot](docs/demo_artifacts/v0.3/before_after.csv)
+- [Pareto table snapshot](docs/demo_artifacts/v0.3/pareto.csv)
+- [Best patch YAML snapshot](docs/demo_artifacts/v0.3/best_patch.yaml)
+- [Rejected fake-safety CSV snapshot](docs/demo_artifacts/v0.3/rejected_ttc_2_5_false_positive.csv)
+- [Rejected fake-safety trace plot snapshot](docs/demo_artifacts/v0.3/rejected_ttc_2_5_false_positive.svg)
+- [Candidate tradeoff chart snapshot](docs/demo_artifacts/v0.3/candidate_tradeoff.svg)
 
 ## Docs
 

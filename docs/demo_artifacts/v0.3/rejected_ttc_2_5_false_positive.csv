@@ -1,0 +1,12 @@
+time_s,scenario_id,scenario_type,risk_label,split,run_id,ego_speed_mps,lead_speed_mps,lead_distance_m,relative_velocity_mps,ttc_s,lane_clear,cut_in_active,sensor_confidence,low_confidence_duration_s,takeover_requested,state,brake_cmd,collision,violation_labels
+0.5,benign_close_following_0000,benign_close_following,benign,benign_challenge,candidate_ttc_2_5__benign_close_following_0000,18.0,17.8,7.9,0.2,39.5,True,False,0.95,0.0,False,FOLLOWING,0.2,False,
+0.6,benign_close_following_0000,benign_close_following,benign,benign_challenge,candidate_ttc_2_5__benign_close_following_0000,18.0,17.8,7.88,0.2,39.4,True,False,0.95,0.0,False,FOLLOWING,0.2,False,
+0.7,benign_close_following_0000,benign_close_following,benign,benign_challenge,candidate_ttc_2_5__benign_close_following_0000,18.0,17.8,7.86,0.2,39.3,True,False,0.95,0.0,False,FOLLOWING,0.2,False,
+0.8,benign_close_following_0000,benign_close_following,benign,benign_challenge,candidate_ttc_2_5__benign_close_following_0000,18.0,17.8,7.84,0.2,39.2,True,False,0.95,0.0,False,FOLLOWING,0.2,False,
+0.9,benign_close_following_0000,benign_close_following,benign,benign_challenge,candidate_ttc_2_5__benign_close_following_0000,18.0,17.8,7.82,0.2,39.1,True,False,0.95,0.0,False,FOLLOWING,0.2,False,
+1.0,benign_close_following_0000,benign_close_following,benign,benign_challenge,candidate_ttc_2_5__benign_close_following_0000,18.0,17.8,7.8,0.2,1.8,True,False,0.95,0.0,False,MIN_RISK_MANEUVER,0.7,False,
+1.1,benign_close_following_0000,benign_close_following,benign,benign_challenge,candidate_ttc_2_5__benign_close_following_0000,17.65,17.8,7.7975,-0.15,1.8,True,False,0.95,0.0,False,MIN_RISK_MANEUVER,0.7,False,
+1.2,benign_close_following_0000,benign_close_following,benign,benign_challenge,candidate_ttc_2_5__benign_close_following_0000,17.3,17.8,7.83,-0.5,1.8,True,False,0.95,0.0,False,MIN_RISK_MANEUVER,0.7,False,
+1.3,benign_close_following_0000,benign_close_following,benign,benign_challenge,candidate_ttc_2_5__benign_close_following_0000,16.95,17.8,7.8975,-0.85,1.8,True,False,0.95,0.0,False,MIN_RISK_MANEUVER,0.7,False,
+1.4,benign_close_following_0000,benign_close_following,benign,benign_challenge,candidate_ttc_2_5__benign_close_following_0000,16.6,17.8,8.0,-1.2,1.8,True,False,0.95,0.0,False,MIN_RISK_MANEUVER,0.7,False,
+1.5,benign_close_following_0000,benign_close_following,benign,benign_challenge,candidate_ttc_2_5__benign_close_following_0000,16.25,17.8,8.1375,-1.55,1.8,True,False,0.95,0.0,False,MIN_RISK_MANEUVER,0.7,False,
