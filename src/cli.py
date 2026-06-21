@@ -58,9 +58,10 @@ def _generate_scenarios(args: argparse.Namespace) -> None:
     write_scenarios_jsonl(scenarios, args.out)
     train_count = sum(1 for scenario in scenarios if scenario.split == "train")
     holdout_count = sum(1 for scenario in scenarios if scenario.split == "holdout")
+    benign_count = sum(1 for scenario in scenarios if scenario.split == "benign_challenge")
     print(
         f"generated_scenarios={len(scenarios)} train={train_count} "
-        f"holdout={holdout_count} out={args.out}"
+        f"holdout={holdout_count} benign_challenge={benign_count} out={args.out}"
     )
 
 
@@ -93,9 +94,11 @@ def _evaluate_candidates(args: argparse.Namespace) -> None:
     print(
         f"baseline_train_total={result['baseline']['train']['score']['total_score']} "
         f"baseline_holdout_total={result['baseline']['holdout']['score']['total_score']} "
+        f"baseline_benign_penalty={result['baseline']['benign_challenge']['score']['utility_penalty']} "
         f"best_patch={best['patch_id']} "
         f"best_train_total={best['split_results']['train']['score']['total_score']} "
         f"best_holdout_total={best['split_results']['holdout']['score']['total_score']} "
+        f"best_benign_penalty={best['split_results']['benign_challenge']['score']['utility_penalty']} "
         f"improvement_pct={best['improvement_pct']} out={args.out}"
     )
 

@@ -67,7 +67,7 @@ def _add_hysteresis(config: dict[str, Any], low: float = 0.40, high: float = 0.5
         "following_to_degraded_hysteresis_enter",
         enter_source,
         "DEGRADED_PERCEPTION",
-        f"sensor_confidence < {low:.2f}",
+        f"sensor_confidence < {low:.2f} and low_confidence_duration_s > 0.50",
     )
     _append_transition(
         config,
@@ -120,8 +120,16 @@ def _apply_cut_in_specific_guard(config: dict[str, Any]) -> None:
     _set_transition_condition(
         config,
         "following_to_mrm",
-        "(cut_in_active and ttc_s < 2.50) or "
+        "(cut_in_active and relative_velocity_mps > 1.00 and ttc_s < 2.50) or "
         "(not cut_in_active and relative_velocity_mps > 0.10 and ttc_s < 1.80)",
+    )
+
+
+def _apply_persistent_takeover_guard(config: dict[str, Any], threshold: float = 0.40) -> None:
+    _set_transition_condition(
+        config,
+        "following_to_takeover",
+        f"sensor_confidence < {threshold:.2f} and low_confidence_duration_s > 1.00",
     )
 
 
@@ -251,7 +259,7 @@ def generate_candidate_patches(supervisor: dict[str, Any]) -> list[CandidatePatc
     )
     _split_following(cfg)
     _set_transition_condition(cfg, "following_to_mrm", "ttc_s < 1.80")
-    _set_transition_condition(cfg, "following_to_takeover", "sensor_confidence < 0.40")
+    _apply_persistent_takeover_guard(cfg)
     add(cfg["metadata"]["patch_id"], cfg["metadata"]["description"], "state_splitting", cfg)
 
     cfg = _with_metadata(
@@ -262,7 +270,7 @@ def generate_candidate_patches(supervisor: dict[str, Any]) -> list[CandidatePatc
     )
     _split_following(cfg)
     _apply_cut_in_specific_guard(cfg)
-    _set_transition_condition(cfg, "following_to_takeover", "sensor_confidence < 0.40")
+    _apply_persistent_takeover_guard(cfg)
     _add_hysteresis(cfg)
     _add_recovery_constraints(cfg, takeover_ttc_threshold=2.50)
     add(cfg["metadata"]["patch_id"], cfg["metadata"]["description"], "architectural_combo", cfg)
@@ -274,7 +282,7 @@ def generate_candidate_patches(supervisor: dict[str, Any]) -> list[CandidatePatc
         "combined",
     )
     _set_transition_condition(cfg, "following_to_mrm", "ttc_s < 2.50")
-    _set_transition_condition(cfg, "following_to_takeover", "sensor_confidence < 0.40")
+    _apply_persistent_takeover_guard(cfg)
     _add_hysteresis(cfg)
     _add_recovery_constraints(cfg, takeover_ttc_threshold=2.50)
     add(cfg["metadata"]["patch_id"], cfg["metadata"]["description"], "combined", cfg)

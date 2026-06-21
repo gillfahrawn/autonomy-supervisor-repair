@@ -3,6 +3,9 @@ from __future__ import annotations
 TRACE_FIELDS = [
     "time_s",
     "scenario_id",
+    "scenario_type",
+    "risk_label",
+    "split",
     "run_id",
     "ego_speed_mps",
     "lead_speed_mps",
@@ -12,6 +15,7 @@ TRACE_FIELDS = [
     "lane_clear",
     "cut_in_active",
     "sensor_confidence",
+    "low_confidence_duration_s",
     "takeover_requested",
     "state",
     "brake_cmd",
@@ -28,6 +32,9 @@ def compute_ttc(lead_distance_m: float, ego_speed_mps: float, lead_speed_mps: fl
 
 def normalize_trace_row(row: dict) -> dict:
     normalized = {field: row.get(field) for field in TRACE_FIELDS}
+    normalized["scenario_type"] = str(normalized["scenario_type"] or "unknown")
+    normalized["risk_label"] = str(normalized["risk_label"] or "dangerous")
+    normalized["split"] = str(normalized["split"] or "train")
     normalized["time_s"] = round(float(normalized["time_s"]), 3)
     normalized["ego_speed_mps"] = round(float(normalized["ego_speed_mps"]), 4)
     normalized["lead_speed_mps"] = round(float(normalized["lead_speed_mps"]), 4)
@@ -35,6 +42,7 @@ def normalize_trace_row(row: dict) -> dict:
     normalized["relative_velocity_mps"] = round(float(normalized["relative_velocity_mps"]), 4)
     normalized["ttc_s"] = round(float(normalized["ttc_s"]), 4)
     normalized["sensor_confidence"] = round(float(normalized["sensor_confidence"]), 4)
+    normalized["low_confidence_duration_s"] = round(float(normalized["low_confidence_duration_s"] or 0.0), 4)
     normalized["brake_cmd"] = round(float(normalized["brake_cmd"]), 4)
     normalized["lane_clear"] = bool(normalized["lane_clear"])
     normalized["cut_in_active"] = bool(normalized["cut_in_active"])
@@ -43,4 +51,3 @@ def normalize_trace_row(row: dict) -> dict:
     labels = normalized["violation_labels"] or []
     normalized["violation_labels"] = list(labels)
     return normalized
-

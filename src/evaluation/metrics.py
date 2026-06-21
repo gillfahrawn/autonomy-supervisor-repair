@@ -15,6 +15,15 @@ from src.verification.stl_properties import (
 )
 
 
+INTERVENTION_STATES = {
+    "DEGRADED_PERCEPTION",
+    "TAKEOVER_REQUESTED",
+    "MIN_RISK_MANEUVER",
+    "EMERGENCY_BRAKE",
+    "SAFE_STOP",
+}
+
+
 @dataclass(frozen=True)
 class ScoreBreakdown:
     collisions: int
@@ -28,6 +37,17 @@ class ScoreBreakdown:
     average_speed_loss_mps: float
     mission_completion_rate: float
     incomplete_missions: int
+    intervention_runs: int
+    intervention_rate: float
+    benign_unnecessary_emergency_brakes: int
+    benign_unnecessary_mrm_activations: int
+    benign_false_takeover_requests: int
+    benign_avoidable_speed_loss_mps: float
+    benign_mission_completion_rate: float
+    benign_incomplete_missions: int
+    benign_intervention_runs: int
+    benign_intervention_rate: float
+    benign_run_count: int
     average_abs_jerk_mps3: float
     max_abs_jerk_mps3: float
     safety_score: int
@@ -78,6 +98,17 @@ def score_events(events: Iterable[ViolationEvent | dict], rows: list[dict] | Non
         average_speed_loss_mps=round(float(utility["average_speed_loss_mps"]), 4),
         mission_completion_rate=round(float(utility["mission_completion_rate"]), 4),
         incomplete_missions=int(utility["incomplete_missions"]),
+        intervention_runs=int(utility["intervention_runs"]),
+        intervention_rate=round(float(utility["intervention_rate"]), 4),
+        benign_unnecessary_emergency_brakes=int(utility["benign_unnecessary_emergency_brakes"]),
+        benign_unnecessary_mrm_activations=int(utility["benign_unnecessary_mrm_activations"]),
+        benign_false_takeover_requests=int(utility["benign_false_takeover_requests"]),
+        benign_avoidable_speed_loss_mps=round(float(utility["benign_avoidable_speed_loss_mps"]), 4),
+        benign_mission_completion_rate=round(float(utility["benign_mission_completion_rate"]), 4),
+        benign_incomplete_missions=int(utility["benign_incomplete_missions"]),
+        benign_intervention_runs=int(utility["benign_intervention_runs"]),
+        benign_intervention_rate=round(float(utility["benign_intervention_rate"]), 4),
+        benign_run_count=int(utility["benign_run_count"]),
         average_abs_jerk_mps3=round(float(utility["average_abs_jerk_mps3"]), 4),
         max_abs_jerk_mps3=round(float(utility["max_abs_jerk_mps3"]), 4),
         safety_score=int(round(safety_score)),
@@ -90,64 +121,111 @@ def score_events(events: Iterable[ViolationEvent | dict], rows: list[dict] | Non
 def compute_utility_metrics(rows: list[dict]) -> dict[str, float | int]:
     grouped = group_by_run(rows)
     if not grouped:
-        return {
-            "unnecessary_emergency_brakes": 0,
-            "unnecessary_mrm_activations": 0,
-            "false_takeover_requests": 0,
-            "average_speed_loss_mps": 0.0,
-            "mission_completion_rate": 0.0,
-            "incomplete_missions": 0,
-            "average_abs_jerk_mps3": 0.0,
-            "max_abs_jerk_mps3": 0.0,
-            "run_count": 0,
-            "total_speed_loss_mps": 0.0,
-        }
+        return _empty_utility_metrics()
 
     unnecessary_emergency = 0
     unnecessary_mrm = 0
     false_takeovers = 0
     completed = 0
+    intervention_runs = 0
     speed_loss_total = 0.0
+    benign_unnecessary_emergency = 0
+    benign_unnecessary_mrm = 0
+    benign_false_takeovers = 0
+    benign_completed = 0
+    benign_incomplete = 0
+    benign_intervention_runs = 0
+    benign_run_count = 0
+    benign_speed_loss_total = 0.0
     jerk_values: list[float] = []
 
     for run_rows in grouped.values():
+        is_benign = _is_benign_run(run_rows)
+        if is_benign:
+            benign_run_count += 1
+
         previous_state = run_rows[0]["state"]
+        run_had_intervention = False
         for row in run_rows:
             state = row["state"]
-            if state != previous_state and _safe_context(row):
+            if state in INTERVENTION_STATES or bool(row.get("takeover_requested")):
+                run_had_intervention = True
+            if state != previous_state and _false_positive_context(row):
                 if state == "EMERGENCY_BRAKE":
                     unnecessary_emergency += 1
+                    if is_benign:
+                        benign_unnecessary_emergency += 1
                 elif state == "MIN_RISK_MANEUVER":
                     unnecessary_mrm += 1
+                    if is_benign:
+                        benign_unnecessary_mrm += 1
                 elif state == "TAKEOVER_REQUESTED":
                     false_takeovers += 1
+                    if is_benign:
+                        benign_false_takeovers += 1
             previous_state = state
 
         initial_speed = float(run_rows[0]["ego_speed_mps"])
         average_speed = sum(float(row["ego_speed_mps"]) for row in run_rows) / len(run_rows)
-        speed_loss_total += max(0.0, initial_speed - average_speed)
+        speed_loss = max(0.0, initial_speed - average_speed)
+        speed_loss_total += speed_loss
+        if is_benign:
+            benign_speed_loss_total += speed_loss
 
         final = run_rows[-1]
         collided = any(row["collision"] for row in run_rows)
-        if (
+        complete = (
             not collided
             and float(final["ego_speed_mps"]) > 2.0
             and final["state"] not in {"SAFE_STOP", "EMERGENCY_BRAKE", "MIN_RISK_MANEUVER"}
-        ):
+        )
+        if complete:
             completed += 1
+            if is_benign:
+                benign_completed += 1
+        elif is_benign:
+            benign_incomplete += 1
+
+        if run_had_intervention:
+            intervention_runs += 1
+            if is_benign:
+                benign_intervention_runs += 1
 
         jerk_values.extend(_jerk_values(run_rows))
 
     run_count = len(grouped)
-    average_speed_loss = speed_loss_total / run_count
     incomplete = run_count - completed
     return {
         "unnecessary_emergency_brakes": unnecessary_emergency,
         "unnecessary_mrm_activations": unnecessary_mrm,
         "false_takeover_requests": false_takeovers,
-        "average_speed_loss_mps": average_speed_loss,
+        "average_speed_loss_mps": speed_loss_total / run_count,
         "mission_completion_rate": completed / run_count,
         "incomplete_missions": incomplete,
+        "intervention_runs": intervention_runs,
+        "intervention_rate": intervention_runs / run_count,
+        "benign_unnecessary_emergency_brakes": benign_unnecessary_emergency,
+        "benign_unnecessary_mrm_activations": benign_unnecessary_mrm,
+        "benign_false_takeover_requests": benign_false_takeovers,
+        "benign_avoidable_speed_loss_mps": (
+            benign_speed_loss_total / benign_run_count
+            if benign_run_count
+            else 0.0
+        ),
+        "benign_mission_completion_rate": (
+            benign_completed / benign_run_count
+            if benign_run_count
+            else 0.0
+        ),
+        "benign_incomplete_missions": benign_incomplete,
+        "benign_intervention_runs": benign_intervention_runs,
+        "benign_intervention_rate": (
+            benign_intervention_runs / benign_run_count
+            if benign_run_count
+            else 0.0
+        ),
+        "benign_run_count": benign_run_count,
+        "benign_total_speed_loss_mps": benign_speed_loss_total,
         "average_abs_jerk_mps3": (
             sum(abs(value) for value in jerk_values) / len(jerk_values)
             if jerk_values
@@ -168,8 +246,53 @@ def compute_utility_penalty(utility: dict[str, float | int]) -> int:
             + 2.0 * float(utility["total_speed_loss_mps"])
             + 25 * int(utility["incomplete_missions"])
             + 0.1 * float(utility["average_abs_jerk_mps3"]) * int(utility["run_count"])
+            + 100 * int(utility["benign_unnecessary_emergency_brakes"])
+            + 60 * int(utility["benign_unnecessary_mrm_activations"])
+            + 40 * int(utility["benign_false_takeover_requests"])
+            + 30 * int(utility["benign_intervention_runs"])
+            + 5.0 * float(utility["benign_total_speed_loss_mps"])
+            + 30 * int(utility["benign_incomplete_missions"])
         )
     )
+
+
+def _empty_utility_metrics() -> dict[str, float | int]:
+    return {
+        "unnecessary_emergency_brakes": 0,
+        "unnecessary_mrm_activations": 0,
+        "false_takeover_requests": 0,
+        "average_speed_loss_mps": 0.0,
+        "mission_completion_rate": 0.0,
+        "incomplete_missions": 0,
+        "intervention_runs": 0,
+        "intervention_rate": 0.0,
+        "benign_unnecessary_emergency_brakes": 0,
+        "benign_unnecessary_mrm_activations": 0,
+        "benign_false_takeover_requests": 0,
+        "benign_avoidable_speed_loss_mps": 0.0,
+        "benign_mission_completion_rate": 0.0,
+        "benign_incomplete_missions": 0,
+        "benign_intervention_runs": 0,
+        "benign_intervention_rate": 0.0,
+        "benign_run_count": 0,
+        "benign_total_speed_loss_mps": 0.0,
+        "average_abs_jerk_mps3": 0.0,
+        "max_abs_jerk_mps3": 0.0,
+        "run_count": 0,
+        "total_speed_loss_mps": 0.0,
+    }
+
+
+def _false_positive_context(row: dict) -> bool:
+    return _is_benign_row(row) or _safe_context(row)
+
+
+def _is_benign_run(rows: list[dict]) -> bool:
+    return any(_is_benign_row(row) for row in rows)
+
+
+def _is_benign_row(row: dict) -> bool:
+    return row.get("risk_label") == "benign" or row.get("split") == "benign_challenge"
 
 
 def _safe_context(row: dict) -> bool:

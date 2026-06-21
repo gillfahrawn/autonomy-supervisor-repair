@@ -46,6 +46,8 @@ def generate_scenarios(config: dict[str, Any]) -> list[Scenario]:
                     road_friction="dry",
                     seed=index,
                     split=_split_for_index(index, holdout_every, holdout_offset),
+                    risk_label="dangerous",
+                    scenario_type="lead_brake",
                 )
             )
             index += 1
@@ -79,9 +81,29 @@ def generate_scenarios(config: dict[str, Any]) -> list[Scenario]:
                     road_friction=friction,
                     seed=index,
                     split=_split_for_index(index, holdout_every, holdout_offset),
+                    risk_label="dangerous",
+                    scenario_type="cut_in",
                 )
             )
             index += 1
+
+    benign = families.get("benign_challenge") or {}
+    benign_index = 0
+    for family_name, family_config in benign.items():
+        keys = list(family_config.keys())
+        for values in itertools.product(*[_as_list(family_config[k]) for k in keys]):
+            params = dict(zip(keys, values, strict=True))
+            scenario_id = f"{family_name}_{benign_index:04d}"
+            scenarios.append(
+                _benign_scenario(
+                    scenario_id=scenario_id,
+                    family_name=family_name,
+                    params=params,
+                    seed=index,
+                )
+            )
+            index += 1
+            benign_index += 1
 
     return scenarios
 
@@ -90,6 +112,47 @@ def _split_for_index(index: int, holdout_every: int, holdout_offset: int) -> str
     if holdout_every <= 1:
         return "holdout"
     return "holdout" if index % holdout_every == holdout_offset else "train"
+
+
+def _benign_scenario(
+    scenario_id: str,
+    family_name: str,
+    params: dict[str, Any],
+    seed: int,
+) -> Scenario:
+    ego_speed = float(params.get("ego_speed_mps", 25.0))
+    initial_gap = float(
+        params.get(
+            "initial_gap_m",
+            params.get("cut_in_gap_m", 40.0),
+        )
+    )
+    relative_speed = float(
+        params.get(
+            "lead_relative_speed_mps",
+            params.get("cut_in_relative_speed_mps", 0.0),
+        )
+    )
+    return Scenario(
+        scenario_id=scenario_id,
+        family=family_name,
+        ego_speed_mps=ego_speed,
+        initial_gap_m=initial_gap,
+        lead_decel_mps2=float(params.get("lead_decel_mps2", 0.0)),
+        sensor_confidence_profile=str(params.get("sensor_confidence_profile", "stable")),
+        driver_takeover_delay_s=float(params.get("driver_takeover_delay_s", 1.5)),
+        cut_in_gap_m=(
+            None if "cut_in_gap_m" not in params else float(params["cut_in_gap_m"])
+        ),
+        cut_in_relative_speed_mps=relative_speed,
+        road_friction=str(params.get("road_friction", "dry")),
+        duration_s=float(params.get("duration_s", 10.0)),
+        dt_s=float(params.get("dt_s", 0.1)),
+        seed=seed,
+        split="benign_challenge",
+        risk_label="benign",
+        scenario_type=family_name,
+    )
 
 
 def generate_scenarios_from_yaml(path: str | Path) -> list[Scenario]:

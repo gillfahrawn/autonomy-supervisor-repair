@@ -20,6 +20,8 @@ class Scenario:
     dt_s: float = 0.1
     seed: int = 0
     split: str = "train"
+    risk_label: str = "dangerous"
+    scenario_type: str = "dangerous"
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -47,4 +49,6 @@ class Scenario:
             dt_s=float(data.get("dt_s", 0.1)),
             seed=int(data.get("seed", 0)),
             split=str(data.get("split", "train")),
+            risk_label=str(data.get("risk_label", "dangerous")),
+            scenario_type=str(data.get("scenario_type", data.get("family", "dangerous"))),
         )

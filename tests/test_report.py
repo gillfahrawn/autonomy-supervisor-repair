@@ -9,6 +9,9 @@ def _row(index: int):
     return {
         "time_s": index * 0.1,
         "scenario_id": "scenario",
+        "scenario_type": "cut_in",
+        "risk_label": "dangerous",
+        "split": "holdout",
         "run_id": "baseline__scenario",
         "ego_speed_mps": 20.0,
         "lead_speed_mps": 10.0,
@@ -18,6 +21,7 @@ def _row(index: int):
         "lane_clear": False,
         "cut_in_active": True,
         "sensor_confidence": 0.95,
+        "low_confidence_duration_s": 0.0,
         "takeover_requested": False,
         "state": "FOLLOWING",
         "brake_cmd": 0.2,
@@ -40,6 +44,17 @@ def _score(collisions: int, safety: int, utility: int = 0):
         "average_speed_loss_mps": 0.0,
         "mission_completion_rate": 1.0,
         "incomplete_missions": 0,
+        "intervention_runs": 0,
+        "intervention_rate": 0.0,
+        "benign_unnecessary_emergency_brakes": 0,
+        "benign_unnecessary_mrm_activations": 0,
+        "benign_false_takeover_requests": 0,
+        "benign_avoidable_speed_loss_mps": 0.0,
+        "benign_mission_completion_rate": 1.0,
+        "benign_incomplete_missions": 0,
+        "benign_intervention_runs": 0,
+        "benign_intervention_rate": 0.0,
+        "benign_run_count": 0,
         "average_abs_jerk_mps3": 0.0,
         "max_abs_jerk_mps3": 0.0,
         "safety_score": safety,
@@ -74,11 +89,13 @@ def test_report_generation_outputs_required_v02_artifacts(tmp_path, baseline_con
     baseline_results = {
         "train": _result(_score(0, 0)),
         "holdout": _result(_score(1, 1000), [event]),
+        "benign_challenge": _result(_score(0, 0, 10)),
         "all": _result(_score(1, 1000), [event]),
     }
     split_results = {
         "train": _result(_score(0, 0, 5)),
         "holdout": _result(_score(0, 0, 7)),
+        "benign_challenge": _result(_score(0, 0, 3)),
         "all": _result(_score(0, 0, 12)),
     }
     candidate_results = [
@@ -90,6 +107,7 @@ def test_report_generation_outputs_required_v02_artifacts(tmp_path, baseline_con
             "violation_counts": {},
             "invariant_check": {"passed": True, "failures": [], "reachable_states": []},
             "improvement_pct": 100.0,
+            "annotated_rows_by_split": {"benign_challenge": []},
         }
     ]
     write_report(
@@ -99,6 +117,7 @@ def test_report_generation_outputs_required_v02_artifacts(tmp_path, baseline_con
         {
             "train": [],
             "holdout": [_row(index) for index in range(6)],
+            "benign_challenge": [],
         },
         baseline_config,
     )
@@ -113,4 +132,5 @@ def test_report_generation_outputs_required_v02_artifacts(tmp_path, baseline_con
     assert any((tmp_path / "trace_plots").iterdir())
     summary = json.loads((tmp_path / "summary.json").read_text(encoding="utf-8"))
     assert summary["best_candidate"]["patch_id"] == "candidate"
+    assert summary["baseline"]["benign_challenge"]["score"]["utility_penalty"] == 10
     assert summary["top_minimized_counterexamples"][0]["window_start_time_s"] == 0.0

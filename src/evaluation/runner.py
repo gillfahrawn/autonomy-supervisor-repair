@@ -81,9 +81,13 @@ def evaluate_candidates(
         config = load_yaml(path)
         rows = run_supervisor_on_scenarios(config, scenarios, candidate["patch_id"])
         rows_by_split = split_trace_rows(rows, scenarios)
-        split_results = {
-            split: _without_annotated_rows(evaluate_trace_rows(split_rows, config))
+        evaluated_by_split = {
+            split: evaluate_trace_rows(split_rows, config)
             for split, split_rows in rows_by_split.items()
+        }
+        split_results = {
+            split: _without_annotated_rows(result)
+            for split, result in evaluated_by_split.items()
         }
         split_results["all"] = _without_annotated_rows(evaluate_trace_rows(rows, config))
         train_score = split_results["train"]["score"]["total_score"]
@@ -105,6 +109,10 @@ def evaluate_candidates(
             "run_count": split_results["train"]["run_count"],
             "invariant_check": split_results["train"]["invariant_check"],
             "improvement_pct": improvement_pct,
+            "annotated_rows_by_split": {
+                split: result["annotated_rows"]
+                for split, result in evaluated_by_split.items()
+            },
         }
         candidate_results.append(candidate_result)
 
@@ -117,7 +125,7 @@ def evaluate_candidates(
     baseline_annotated_rows_by_split = {
         split: result["annotated_rows"]
         for split, result in baseline_results.items()
-        if split in {"train", "holdout"}
+        if split in {"train", "holdout", "benign_challenge"}
     }
     write_report(out_dir, baseline_results, candidate_results, baseline_annotated_rows_by_split, best_config)
     return {
@@ -130,7 +138,7 @@ def evaluate_candidates(
 
 
 def split_scenarios(scenarios: list[Scenario]) -> dict[str, list[Scenario]]:
-    splits: dict[str, list[Scenario]] = {"train": [], "holdout": []}
+    splits: dict[str, list[Scenario]] = {"train": [], "holdout": [], "benign_challenge": []}
     for scenario in scenarios:
         splits.setdefault(scenario.split, []).append(scenario)
     return splits
@@ -138,7 +146,7 @@ def split_scenarios(scenarios: list[Scenario]) -> dict[str, list[Scenario]]:
 
 def split_trace_rows(rows: list[dict], scenarios: list[Scenario]) -> dict[str, list[dict]]:
     split_by_scenario = {scenario.scenario_id: scenario.split for scenario in scenarios}
-    splits: dict[str, list[dict]] = {"train": [], "holdout": []}
+    splits: dict[str, list[dict]] = {"train": [], "holdout": [], "benign_challenge": []}
     for row in rows:
         split = split_by_scenario.get(row["scenario_id"], "train")
         splits.setdefault(split, []).append(row)

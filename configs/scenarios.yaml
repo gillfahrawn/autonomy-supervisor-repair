@@ -16,3 +16,35 @@ scenario_families:
     cut_in_relative_speed_mps: [-8, -4, 0]
     road_friction: ["dry", "wet"]
     sensor_confidence_profile: ["stable", "dropout", "noisy"]
+
+  benign_challenge:
+    benign_close_following:
+      ego_speed_mps: [18, 25, 32]
+      initial_gap_m: [8, 12, 18]
+      lead_relative_speed_mps: [-0.2, 0.0, 0.2]
+      sensor_confidence_profile: ["stable"]
+
+    brief_sensor_blip:
+      ego_speed_mps: [18, 25, 32]
+      initial_gap_m: [25, 35]
+      lead_relative_speed_mps: [0.0]
+      sensor_confidence_profile: ["brief_blip"]
+
+    safe_cut_in:
+      ego_speed_mps: [18, 25, 32]
+      cut_in_gap_m: [18, 25, 35]
+      cut_in_relative_speed_mps: [-1, 0, 1]
+      road_friction: ["dry"]
+      sensor_confidence_profile: ["stable"]
+
+    lane_clear_high_ttc:
+      ego_speed_mps: [18, 25, 32]
+      initial_gap_m: [80, 120]
+      lead_relative_speed_mps: [0.0, 2.0]
+      sensor_confidence_profile: ["stable"]
+
+    noisy_nonpersistent_perception:
+      ego_speed_mps: [18, 25, 32]
+      initial_gap_m: [30, 45]
+      lead_relative_speed_mps: [0.0]
+      sensor_confidence_profile: ["mild_noisy"]

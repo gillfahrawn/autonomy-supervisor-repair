@@ -23,19 +23,20 @@ class PythonKinematicSimulator(SimulatorAdapter):
         run = run_id or scenario.scenario_id
 
         ego_speed = scenario.ego_speed_mps
-        lead_speed = scenario.ego_speed_mps
+        lead_speed = self._initial_lead_speed(scenario)
         lead_distance = scenario.initial_gap_m
         takeover_latched = False
+        low_confidence_duration_s = 0.0
         rows: list[dict] = []
 
         for step in range(steps):
             time_s = round(step * dt, 10)
             cut_in_active = self._cut_in_active(scenario, time_s)
             lane_clear = not cut_in_active
-            if scenario.family == "cut_in" and not cut_in_active:
+            if scenario.family in {"cut_in", "safe_cut_in"} and not cut_in_active:
                 lead_distance = max(lead_distance, 90.0)
                 lead_speed = ego_speed
-            elif scenario.family == "cut_in" and abs(time_s - 1.0) < (dt / 2.0):
+            elif scenario.family in {"cut_in", "safe_cut_in"} and abs(time_s - 1.0) < (dt / 2.0):
                 lead_distance = float(scenario.cut_in_gap_m or scenario.initial_gap_m)
                 lead_speed = max(
                     0.0,
@@ -43,8 +44,16 @@ class PythonKinematicSimulator(SimulatorAdapter):
                 )
 
             sensor_confidence = self._sensor_confidence(scenario.sensor_confidence_profile, time_s)
+            if sensor_confidence < 0.4:
+                low_confidence_duration_s += dt
+            else:
+                low_confidence_duration_s = 0.0
             relative_velocity = ego_speed - lead_speed
-            ttc = compute_ttc(lead_distance, ego_speed, lead_speed)
+            ttc = self._observed_ttc(
+                scenario,
+                time_s,
+                compute_ttc(lead_distance, ego_speed, lead_speed),
+            )
 
             observation = {
                 "time_s": time_s,
@@ -56,6 +65,7 @@ class PythonKinematicSimulator(SimulatorAdapter):
                 "lane_clear": lane_clear,
                 "cut_in_active": cut_in_active,
                 "sensor_confidence": sensor_confidence,
+                "low_confidence_duration_s": low_confidence_duration_s,
             }
             decision = machine.step(observation)
             if decision.state == "TAKEOVER_REQUESTED":
@@ -66,6 +76,9 @@ class PythonKinematicSimulator(SimulatorAdapter):
                 {
                     "time_s": time_s,
                     "scenario_id": scenario.scenario_id,
+                    "scenario_type": scenario.scenario_type,
+                    "risk_label": scenario.risk_label,
+                    "split": scenario.split,
                     "run_id": run,
                     "ego_speed_mps": ego_speed,
                     "lead_speed_mps": lead_speed,
@@ -75,6 +88,7 @@ class PythonKinematicSimulator(SimulatorAdapter):
                     "lane_clear": lane_clear,
                     "cut_in_active": cut_in_active,
                     "sensor_confidence": sensor_confidence,
+                    "low_confidence_duration_s": low_confidence_duration_s,
                     "takeover_requested": takeover_latched,
                     "state": decision.state,
                     "brake_cmd": decision.action.brake_cmd,
@@ -98,7 +112,7 @@ class PythonKinematicSimulator(SimulatorAdapter):
 
     @staticmethod
     def _cut_in_active(scenario: Scenario, time_s: float) -> bool:
-        return scenario.family == "cut_in" and time_s >= 1.0
+        return scenario.family in {"cut_in", "safe_cut_in"} and time_s >= 1.0
 
     @staticmethod
     def _sensor_confidence(profile: str, time_s: float) -> float:
@@ -111,6 +125,13 @@ class PythonKinematicSimulator(SimulatorAdapter):
                 return 0.90
             phase = int(math.floor((time_s - 1.5) / 0.4))
             return 0.34 if phase % 2 == 0 else 0.52
+        if profile == "brief_blip":
+            return 0.35 if 2.0 <= time_s <= 2.3 else 0.95
+        if profile == "mild_noisy":
+            if time_s < 1.5 or time_s > 7.0:
+                return 0.90
+            phase = int(math.floor((time_s - 1.5) / 0.3))
+            return 0.42 if phase % 2 == 0 else 0.58
         return 0.95
 
     @staticmethod
@@ -124,7 +145,25 @@ class PythonKinematicSimulator(SimulatorAdapter):
         return 0.0
 
     @staticmethod
+    def _observed_ttc(scenario: Scenario, time_s: float, computed_ttc: float) -> float:
+        if scenario.family == "benign_close_following" and 1.0 <= time_s <= 4.0:
+            return min(computed_ttc, 1.80)
+        if scenario.family == "safe_cut_in" and 1.0 <= time_s <= 3.0:
+            return min(computed_ttc, 2.20)
+        return computed_ttc
+
+    @staticmethod
+    def _initial_lead_speed(scenario: Scenario) -> float:
+        if scenario.family in {
+            "benign_close_following",
+            "brief_sensor_blip",
+            "lane_clear_high_ttc",
+            "noisy_nonpersistent_perception",
+        }:
+            return max(0.0, scenario.ego_speed_mps + float(scenario.cut_in_relative_speed_mps or 0.0))
+        return scenario.ego_speed_mps
+
+    @staticmethod
     def _ego_accel(target_accel_mps2: float, road_friction: str) -> float:
         min_accel = -7.0 if road_friction == "dry" else -5.0
         return max(min_accel, min(2.0, target_accel_mps2))
-

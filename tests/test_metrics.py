@@ -29,6 +29,9 @@ def test_utility_metrics_are_reported_from_trace_rows():
             {
                 "time_s": index * 0.1,
                 "scenario_id": "scenario",
+                "scenario_type": "lane_clear_high_ttc",
+                "risk_label": "benign",
+                "split": "benign_challenge",
                 "run_id": "run",
                 "ego_speed_mps": 20.0 - index,
                 "lead_speed_mps": 20.0,
@@ -38,6 +41,7 @@ def test_utility_metrics_are_reported_from_trace_rows():
                 "lane_clear": True,
                 "cut_in_active": False,
                 "sensor_confidence": 0.95,
+                "low_confidence_duration_s": 0.0,
                 "takeover_requested": False,
                 "state": state,
                 "brake_cmd": 0.7 if state == "MIN_RISK_MANEUVER" else 0.0,
@@ -48,5 +52,7 @@ def test_utility_metrics_are_reported_from_trace_rows():
     score = score_events([], rows)
     assert score.safety_score == 0
     assert score.unnecessary_mrm_activations == 1
+    assert score.benign_unnecessary_mrm_activations == 1
+    assert score.benign_intervention_rate == 1.0
     assert score.average_speed_loss_mps > 0
     assert score.utility_penalty > 0

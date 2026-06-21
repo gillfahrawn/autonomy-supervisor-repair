@@ -6,7 +6,11 @@ import shutil
 from pathlib import Path
 from typing import Any
 
-from src.evaluation.selection import SELECTION_CRITERION, rank_candidates_for_selection
+from src.evaluation.selection import (
+    SELECTION_CRITERION,
+    candidate_selection_score,
+    rank_candidates_for_selection,
+)
 from src.supervisor.schemas import dump_yaml
 from src.traces.io import group_by_run, write_csv
 from src.verification.stl_properties import PROPERTY_DESCRIPTIONS
@@ -21,7 +25,12 @@ def write_report(
 ) -> None:
     out = Path(out_dir)
     out.mkdir(parents=True, exist_ok=True)
-    for subdir in ("failure_examples", "minimized_counterexamples", "trace_plots"):
+    for subdir in (
+        "failure_examples",
+        "minimized_counterexamples",
+        "benign_false_positives",
+        "trace_plots",
+    ):
         path = out / subdir
         if path.exists():
             shutil.rmtree(path)
@@ -32,6 +41,7 @@ def write_report(
     best = ranked[0] if ranked else None
     baseline_train = baseline_results["train"]
     baseline_holdout = baseline_results["holdout"]
+    baseline_benign = baseline_results["benign_challenge"]
     train_improvement_pct = _improvement_pct(
         baseline_train["score"]["total_score"],
         best["split_results"]["train"]["score"]["total_score"] if best else baseline_train["score"]["total_score"],
@@ -45,22 +55,30 @@ def write_report(
     _write_before_after(out / "before_after.csv", baseline_results, ranked)
     _write_pareto_csv(out / "pareto.csv", pareto_rows)
     top_failures = _write_minimized_counterexamples(out, baseline_results, baseline_rows_by_split)
+    top_benign_false_positives = _write_benign_false_positive_examples(out, best)
 
     summary = {
         "selection_criterion": SELECTION_CRITERION,
         "baseline": {
             "train": _summary_result(baseline_train),
             "holdout": _summary_result(baseline_holdout),
+            "benign_challenge": _summary_result(baseline_benign),
             "all": _summary_result(baseline_results["all"]),
         },
         "best_candidate": (
             {
                 "patch_id": best["patch_id"],
                 "description": best["description"],
+                "selection_score": candidate_selection_score(best),
                 "train": _summary_result(best["split_results"]["train"]),
                 "holdout": _summary_result(best["split_results"]["holdout"]),
+                "benign_challenge": _summary_result(best["split_results"]["benign_challenge"]),
                 "train_improvement_pct": train_improvement_pct,
                 "holdout_improvement_pct": holdout_improvement_pct,
+                "benign_utility_delta": (
+                    best["split_results"]["benign_challenge"]["score"]["utility_penalty"]
+                    - baseline_benign["score"]["utility_penalty"]
+                ),
                 "invariant_check": best["invariant_check"],
                 "passes_invariant_checks": best["invariant_check"]["passed"],
             }
@@ -71,12 +89,16 @@ def write_report(
             {
                 "selection_rank": index + 1,
                 "patch_id": candidate["patch_id"],
+                "selection_score": candidate_selection_score(candidate),
                 "train_safety_score": candidate["split_results"]["train"]["score"]["safety_score"],
                 "train_utility_penalty": candidate["split_results"]["train"]["score"]["utility_penalty"],
                 "train_total_score": candidate["split_results"]["train"]["score"]["total_score"],
                 "holdout_safety_score": candidate["split_results"]["holdout"]["score"]["safety_score"],
                 "holdout_utility_penalty": candidate["split_results"]["holdout"]["score"]["utility_penalty"],
                 "holdout_total_score": candidate["split_results"]["holdout"]["score"]["total_score"],
+                "benign_utility_penalty": candidate["split_results"]["benign_challenge"]["score"]["utility_penalty"],
+                "benign_intervention_rate": candidate["split_results"]["benign_challenge"]["score"]["benign_intervention_rate"],
+                "benign_intervention_runs": candidate["split_results"]["benign_challenge"]["score"]["benign_intervention_runs"],
                 "improvement_pct": candidate["improvement_pct"],
                 "violation_counts": candidate["violation_counts"],
                 "invariant_passed": candidate["invariant_check"]["passed"],
@@ -85,6 +107,7 @@ def write_report(
         ],
         "pareto_table": pareto_rows,
         "top_minimized_counterexamples": top_failures,
+        "top_benign_false_positive_examples": top_benign_false_positives,
     }
     with (out / "summary.json").open("w", encoding="utf-8") as handle:
         json.dump(summary, handle, indent=2)
@@ -98,6 +121,7 @@ def write_report(
         train_improvement_pct=train_improvement_pct,
         holdout_improvement_pct=holdout_improvement_pct,
         top_failures=top_failures,
+        top_benign_false_positives=top_benign_false_positives,
     )
 
 
@@ -129,12 +153,22 @@ def _write_before_after(
     fieldnames = [
         "selection_rank",
         "patch_id",
+        "selection_score",
+        "invariant_passed",
         "train_safety_score",
         "train_utility_penalty",
         "train_total_score",
         "holdout_safety_score",
         "holdout_utility_penalty",
         "holdout_total_score",
+        "benign_utility_penalty",
+        "benign_intervention_rate",
+        "benign_intervention_runs",
+        "benign_unnecessary_emergency_brakes",
+        "benign_unnecessary_mrm_activations",
+        "benign_false_takeover_requests",
+        "benign_avoidable_speed_loss_mps",
+        "benign_mission_completion_rate",
         "train_improvement_pct",
         "holdout_improvement_pct",
         "train_collisions",
@@ -156,16 +190,27 @@ def _write_before_after(
         for index, candidate in enumerate(ranked, start=1):
             train_score = candidate["split_results"]["train"]["score"]
             holdout_score = candidate["split_results"]["holdout"]["score"]
+            benign_score = candidate["split_results"]["benign_challenge"]["score"]
             writer.writerow(
                 {
                     "selection_rank": index,
                     "patch_id": candidate["patch_id"],
+                    "selection_score": candidate_selection_score(candidate),
+                    "invariant_passed": candidate["invariant_check"]["passed"],
                     "train_safety_score": train_score["safety_score"],
                     "train_utility_penalty": train_score["utility_penalty"],
                     "train_total_score": train_score["total_score"],
                     "holdout_safety_score": holdout_score["safety_score"],
                     "holdout_utility_penalty": holdout_score["utility_penalty"],
                     "holdout_total_score": holdout_score["total_score"],
+                    "benign_utility_penalty": benign_score["utility_penalty"],
+                    "benign_intervention_rate": benign_score["benign_intervention_rate"],
+                    "benign_intervention_runs": benign_score["benign_intervention_runs"],
+                    "benign_unnecessary_emergency_brakes": benign_score["benign_unnecessary_emergency_brakes"],
+                    "benign_unnecessary_mrm_activations": benign_score["benign_unnecessary_mrm_activations"],
+                    "benign_false_takeover_requests": benign_score["benign_false_takeover_requests"],
+                    "benign_avoidable_speed_loss_mps": benign_score["benign_avoidable_speed_loss_mps"],
+                    "benign_mission_completion_rate": benign_score["benign_mission_completion_rate"],
                     "train_improvement_pct": _improvement_pct(baseline_train_total, train_score["total_score"]),
                     "holdout_improvement_pct": _improvement_pct(baseline_holdout_total, holdout_score["total_score"]),
                     "train_collisions": train_score["collisions"],
@@ -202,12 +247,15 @@ def _pareto_rows(ranked: list[dict[str, Any]]) -> list[dict[str, Any]]:
         rows.append(
             {
                 "patch_id": candidate["patch_id"],
+                "selection_score": candidate_selection_score(candidate),
                 "train_safety_score": train["safety_score"],
                 "train_utility_penalty": train["utility_penalty"],
                 "train_total_score": train["total_score"],
                 "holdout_safety_score": candidate["split_results"]["holdout"]["score"]["safety_score"],
                 "holdout_utility_penalty": candidate["split_results"]["holdout"]["score"]["utility_penalty"],
                 "holdout_total_score": candidate["split_results"]["holdout"]["score"]["total_score"],
+                "benign_utility_penalty": candidate["split_results"]["benign_challenge"]["score"]["utility_penalty"],
+                "benign_intervention_rate": candidate["split_results"]["benign_challenge"]["score"]["benign_intervention_rate"],
                 "pareto_front": not dominated_by,
                 "dominated_by": dominated_by[:3],
             }
@@ -229,12 +277,15 @@ def _write_pareto_csv(path: Path, rows: list[dict[str, Any]]) -> None:
     fieldnames = [
         "pareto_rank",
         "patch_id",
+        "selection_score",
         "train_safety_score",
         "train_utility_penalty",
         "train_total_score",
         "holdout_safety_score",
         "holdout_utility_penalty",
         "holdout_total_score",
+        "benign_utility_penalty",
+        "benign_intervention_rate",
         "pareto_front",
         "dominated_by",
     ]
@@ -298,6 +349,89 @@ def _write_minimized_counterexamples(
             }
         )
     return examples
+
+
+def _write_benign_false_positive_examples(
+    out: Path,
+    best: dict[str, Any] | None,
+) -> list[dict[str, Any]]:
+    if not best:
+        return []
+    benign_rows = best.get("annotated_rows_by_split", {}).get("benign_challenge", [])
+    grouped = group_by_run(benign_rows)
+    examples: list[dict[str, Any]] = []
+    for run_id, run_rows in grouped.items():
+        event = _first_benign_intervention_event(run_rows)
+        if not event:
+            continue
+        window = minimize_counterexample_window(run_rows, event)
+        index = len(examples) + 1
+        stem = f"{index}_{run_id}"
+        csv_name = f"benign_false_positives/{stem}.csv"
+        json_name = f"benign_false_positives/{stem}.json"
+        svg_name = f"trace_plots/benign_{stem}.svg"
+        write_csv(window, out / csv_name)
+        with (out / json_name).open("w", encoding="utf-8") as handle:
+            json.dump(
+                {
+                    "event": event,
+                    "split": "benign_challenge",
+                    "window_start_time_s": window[0]["time_s"] if window else None,
+                    "window_end_time_s": window[-1]["time_s"] if window else None,
+                    "rows": window,
+                },
+                handle,
+                indent=2,
+            )
+        _write_svg_plot(window, out / svg_name, title=run_id)
+        examples.append(
+            {
+                "event_type": event["property_id"],
+                "split": "benign_challenge",
+                "run_id": run_id,
+                "scenario_id": event["scenario_id"],
+                "scenario_type": event["scenario_type"],
+                "time_s": event["time_s"],
+                "row_index": event["row_index"],
+                "window_start_time_s": window[0]["time_s"] if window else None,
+                "window_end_time_s": window[-1]["time_s"] if window else None,
+                "csv": csv_name,
+                "json": json_name,
+                "plot": svg_name,
+            }
+        )
+        if len(examples) >= 5:
+            break
+    return examples
+
+
+def _first_benign_intervention_event(run_rows: list[dict]) -> dict[str, Any] | None:
+    previous_state = run_rows[0]["state"] if run_rows else None
+    for index, row in enumerate(run_rows):
+        state = row["state"]
+        if state != previous_state and state in {
+            "DEGRADED_PERCEPTION",
+            "TAKEOVER_REQUESTED",
+            "MIN_RISK_MANEUVER",
+            "EMERGENCY_BRAKE",
+            "SAFE_STOP",
+        }:
+            return {
+                "property_id": f"BENIGN_FALSE_POSITIVE_{state}",
+                "run_id": row["run_id"],
+                "scenario_id": row["scenario_id"],
+                "scenario_type": row.get("scenario_type", "unknown"),
+                "time_s": row["time_s"],
+                "row_index": index,
+                "message": f"Benign scenario entered {state}.",
+                "details": {
+                    "ttc_s": row["ttc_s"],
+                    "relative_velocity_mps": row["relative_velocity_mps"],
+                    "sensor_confidence": row["sensor_confidence"],
+                },
+            }
+        previous_state = state
+    return None
 
 
 def minimize_counterexample_window(
@@ -368,9 +502,11 @@ def _write_index(
     train_improvement_pct: float,
     holdout_improvement_pct: float,
     top_failures: list[dict[str, Any]],
+    top_benign_false_positives: list[dict[str, Any]],
 ) -> None:
     baseline_train = baseline_results["train"]
     baseline_holdout = baseline_results["holdout"]
+    baseline_benign = baseline_results["benign_challenge"]
     lines = [
         "# Counterexample-Guided Supervisor Repair Report",
         "",
@@ -378,12 +514,23 @@ def _write_index(
         "",
         "This is a SIL-first toy simulator report with formal-tool-compatible invariant checks.",
         "",
-        "## Baseline Train/Holdout",
+        "## Dangerous Scenario Performance",
         "",
         "| Split | Runs | Failing Runs | Failure Rate | Safety Score | Utility Penalty | Total Score |",
         "| --- | ---: | ---: | ---: | ---: | ---: | ---: |",
-        _score_row("train", baseline_train),
-        _score_row("holdout", baseline_holdout),
+        _score_row("dangerous train baseline", baseline_train),
+        _score_row("dangerous holdout baseline", baseline_holdout),
+        "",
+        "## Benign Challenge Performance",
+        "",
+        "| Suite | Runs | Intervention Rate | Benign MRM | False Takeover | Emergency Brakes | Completion Rate | Utility Penalty |",
+        "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
+        _benign_score_row("baseline", baseline_benign),
+    ]
+    if best:
+        lines.append(_benign_score_row("selected patch", best["split_results"]["benign_challenge"]))
+    lines.extend(
+        [
         "",
         "## Selection Criterion",
         "",
@@ -391,23 +538,26 @@ def _write_index(
         "",
         "## Candidate Rankings",
         "",
-        "| Selection Rank | Patch | Train Total | Holdout Total | Train Safety | Train Utility | Holdout Safety | Holdout Utility |",
-        "| ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: |",
-    ]
+        "| Selection Rank | Patch | Invariants | Selection Score | Holdout Total | Benign Penalty | Benign Intervention Rate | Train Total |",
+        "| ---: | --- | --- | ---: | ---: | ---: | ---: | ---: |",
+        ]
+    )
     for index, candidate in enumerate(ranked, start=1):
         train = candidate["split_results"]["train"]["score"]
         holdout = candidate["split_results"]["holdout"]["score"]
+        benign = candidate["split_results"]["benign_challenge"]["score"]
+        invariant_status = "pass" if candidate["invariant_check"]["passed"] else "fail"
         lines.append(
-            f"| {index} | `{candidate['patch_id']}` | {train['total_score']} | {holdout['total_score']} | "
-            f"{train['safety_score']} | {train['utility_penalty']} | "
-            f"{holdout['safety_score']} | {holdout['utility_penalty']} |"
+            f"| {index} | `{candidate['patch_id']}` | {invariant_status} | {candidate_selection_score(candidate)} | "
+            f"{holdout['total_score']} | {benign['utility_penalty']} | "
+            f"{benign['benign_intervention_rate']:.2%} | {train['total_score']} |"
         )
 
     lines.extend(["", "## Pareto Table", ""])
     lines.extend(
         [
-            "| Pareto Rank | Patch | Front | Train Safety | Train Utility | Holdout Safety | Holdout Utility |",
-            "| ---: | --- | --- | ---: | ---: | ---: | ---: |",
+            "| Pareto Rank | Patch | Front | Train Safety | Train Utility | Holdout Safety | Holdout Utility | Benign Penalty |",
+            "| ---: | --- | --- | ---: | ---: | ---: | ---: | ---: |",
         ]
     )
     for row in pareto_rows:
@@ -415,23 +565,27 @@ def _write_index(
         lines.append(
             f"| {row['pareto_rank']} | `{row['patch_id']}` | {front} | "
             f"{row['train_safety_score']} | {row['train_utility_penalty']} | "
-            f"{row['holdout_safety_score']} | {row['holdout_utility_penalty']} |"
+            f"{row['holdout_safety_score']} | {row['holdout_utility_penalty']} | "
+            f"{row['benign_utility_penalty']} |"
         )
 
     if best:
         train = best["split_results"]["train"]["score"]
         holdout = best["split_results"]["holdout"]["score"]
+        benign = best["split_results"]["benign_challenge"]["score"]
         lines.extend(
             [
                 "",
-                "## Best Patch",
+                "## Best Patch Explanation",
                 "",
                 f"- Patch: `{best['patch_id']}`",
                 f"- Explanation: {best['description']}",
+                f"- Selection score: {candidate_selection_score(best)}",
                 f"- Train improvement: {train_improvement_pct:.2f}%",
                 f"- Holdout improvement: {holdout_improvement_pct:.2f}%",
                 f"- Train safety/utility/total: {train['safety_score']} / {train['utility_penalty']} / {train['total_score']}",
                 f"- Holdout safety/utility/total: {holdout['safety_score']} / {holdout['utility_penalty']} / {holdout['total_score']}",
+                f"- Benign utility penalty/intervention rate/completion: {benign['utility_penalty']} / {benign['benign_intervention_rate']:.2%} / {benign['benign_mission_completion_rate']:.2%}",
                 f"- Formal-tool-compatible invariant checks passed: {best['invariant_check']['passed']}",
             ]
         )
@@ -451,19 +605,19 @@ def _write_index(
     lines.extend(
         [
             "",
-            "## Safety Vs Utility Breakdown",
+            "## Safety vs Utility/Fake-Safety Breakdown",
             "",
             "- Safety score uses collision, critical TTC, sensor degradation, oscillation, and fake-safety property violations.",
-            "- Utility penalty uses unnecessary emergency braking, unnecessary MRM activation, false takeover requests, average speed loss, mission completion, and average jerk proxy.",
+            "- Benign challenge utility penalty focuses on unnecessary emergency braking, unnecessary MRM activation, false takeover requests, avoidable speed loss, benign completion, and benign intervention rate.",
+            "- Dangerous performance and benign challenge performance are intentionally both part of selection, so a patch cannot win solely by braking earlier in dangerous cases.",
             "- See `before_after.csv` and `pareto.csv` for complete candidate-level metrics.",
             "",
             "## Utility Interpretation",
             "",
-            "- In this scenario set, utility differentiation is driven mostly by average speed loss, mission completion rate, and the jerk proxy.",
-            "- Unnecessary emergency braking, unnecessary MRM activation, and false takeover request counts remain zero for the selected candidate, so this run should not be read as broad fake-safety coverage.",
-            "- Those counters are retained as hooks for richer future scenarios where safe-context false positives are exercised directly.",
+            "- In v0.3, benign challenge utility differentiation is driven by both intervention counts and avoidable speed loss/completion effects.",
+            "- If the selected patch has zero benign MRM/takeover/emergency counts, fake-safety coverage should be read as passing these challenge cases, not as broad production evidence.",
             "",
-            "## Top 5 Minimized Counterexamples",
+            "## Top Minimized Dangerous Counterexamples",
             "",
         ]
     )
@@ -474,6 +628,18 @@ def _write_index(
             f"{failure['window_end_time_s']}s: [{failure['csv']}]({failure['csv']}), "
             f"[plot]({failure['plot']})"
         )
+
+    lines.extend(["", "## Top Benign False-Positive Examples", ""])
+    if top_benign_false_positives:
+        for example in top_benign_false_positives:
+            lines.append(
+                f"- `{example['event_type']}` in `{example['scenario_type']}` at "
+                f"t={example['time_s']}s, minimized to {example['window_start_time_s']}s-"
+                f"{example['window_end_time_s']}s: [{example['csv']}]({example['csv']}), "
+                f"[plot]({example['plot']})"
+            )
+    else:
+        lines.append("- None for the selected patch.")
 
     lines.extend(["", "## Runtime Properties", ""])
     for property_id, description in PROPERTY_DESCRIPTIONS.items():
@@ -498,6 +664,18 @@ def _score_row(split: str, result: dict[str, Any]) -> str:
         f"| {split} | {result['run_count']} | {result['failing_run_count']} | "
         f"{result['failure_rate']:.2%} | {score['safety_score']} | "
         f"{score['utility_penalty']} | {score['total_score']} |"
+    )
+
+
+def _benign_score_row(label: str, result: dict[str, Any]) -> str:
+    score = result["score"]
+    return (
+        f"| {label} | {result['run_count']} | {score['benign_intervention_rate']:.2%} | "
+        f"{score['benign_unnecessary_mrm_activations']} | "
+        f"{score['benign_false_takeover_requests']} | "
+        f"{score['benign_unnecessary_emergency_brakes']} | "
+        f"{score['benign_mission_completion_rate']:.2%} | "
+        f"{score['utility_penalty']} |"
     )
 
 
