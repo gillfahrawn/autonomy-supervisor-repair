@@ -25,16 +25,20 @@ def write_report(
 ) -> None:
     out = Path(out_dir)
     out.mkdir(parents=True, exist_ok=True)
-    for subdir in (
+    managed_subdirs = (
         "failure_examples",
         "minimized_counterexamples",
         "benign_false_positives",
+        "selected_patch_benign_false_positives",
+        "rejected_candidate_false_positives",
         "trace_plots",
-    ):
+    )
+    for subdir in managed_subdirs:
         path = out / subdir
         if path.exists():
             shutil.rmtree(path)
-        path.mkdir(exist_ok=True)
+        if subdir != "benign_false_positives":
+            path.mkdir(exist_ok=True)
 
     ranked = _rank_candidates(candidate_results)
     pareto_rows = _pareto_rows(ranked)
@@ -55,7 +59,8 @@ def write_report(
     _write_before_after(out / "before_after.csv", baseline_results, ranked)
     _write_pareto_csv(out / "pareto.csv", pareto_rows)
     top_failures = _write_minimized_counterexamples(out, baseline_results, baseline_rows_by_split)
-    top_benign_false_positives = _write_benign_false_positive_examples(out, best)
+    selected_patch_false_positives = _write_selected_patch_benign_false_positive_examples(out, best)
+    rejected_false_positives = _write_rejected_candidate_false_positive_examples(out, ranked)
 
     summary = {
         "selection_criterion": SELECTION_CRITERION,
@@ -107,7 +112,9 @@ def write_report(
         ],
         "pareto_table": pareto_rows,
         "top_minimized_counterexamples": top_failures,
-        "top_benign_false_positive_examples": top_benign_false_positives,
+        "selected_patch_benign_false_positive_examples": selected_patch_false_positives,
+        "top_benign_false_positive_examples": selected_patch_false_positives,
+        "rejected_candidate_false_positive_examples": rejected_false_positives,
     }
     with (out / "summary.json").open("w", encoding="utf-8") as handle:
         json.dump(summary, handle, indent=2)
@@ -121,7 +128,8 @@ def write_report(
         train_improvement_pct=train_improvement_pct,
         holdout_improvement_pct=holdout_improvement_pct,
         top_failures=top_failures,
-        top_benign_false_positives=top_benign_false_positives,
+        selected_patch_false_positives=selected_patch_false_positives,
+        rejected_false_positives=rejected_false_positives,
     )
 
 
@@ -351,7 +359,7 @@ def _write_minimized_counterexamples(
     return examples
 
 
-def _write_benign_false_positive_examples(
+def _write_selected_patch_benign_false_positive_examples(
     out: Path,
     best: dict[str, Any] | None,
 ) -> list[dict[str, Any]]:
@@ -367,8 +375,8 @@ def _write_benign_false_positive_examples(
         window = minimize_counterexample_window(run_rows, event)
         index = len(examples) + 1
         stem = f"{index}_{run_id}"
-        csv_name = f"benign_false_positives/{stem}.csv"
-        json_name = f"benign_false_positives/{stem}.json"
+        csv_name = f"selected_patch_benign_false_positives/{stem}.csv"
+        json_name = f"selected_patch_benign_false_positives/{stem}.json"
         svg_name = f"trace_plots/benign_{stem}.svg"
         write_csv(window, out / csv_name)
         with (out / json_name).open("w", encoding="utf-8") as handle:
@@ -403,6 +411,87 @@ def _write_benign_false_positive_examples(
         if len(examples) >= 5:
             break
     return examples
+
+
+def _write_rejected_candidate_false_positive_examples(
+    out: Path,
+    ranked: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    target_patch_ids = (
+        "candidate_ttc_2_5",
+        "candidate_full_mvp_repair",
+        "candidate_combined_ttc_sensor",
+    )
+    examples: list[dict[str, Any]] = []
+    for patch_id in target_patch_ids:
+        candidate = _candidate_by_patch_id(ranked, patch_id)
+        if not candidate:
+            continue
+        benign_rows = candidate.get("annotated_rows_by_split", {}).get("benign_challenge", [])
+        grouped = group_by_run(benign_rows)
+        candidate_examples = 0
+        for run_id in sorted(grouped):
+            run_rows = grouped[run_id]
+            event = _first_benign_intervention_event(run_rows)
+            if not event:
+                continue
+            candidate_examples += 1
+            window = minimize_counterexample_window(run_rows, event)
+            stem = f"{patch_id}_{candidate_examples}_{run_id}"
+            csv_name = f"rejected_candidate_false_positives/{stem}.csv"
+            json_name = f"rejected_candidate_false_positives/{stem}.json"
+            svg_name = f"trace_plots/rejected_{stem}.svg"
+            write_csv(window, out / csv_name)
+            benign_score = candidate["split_results"]["benign_challenge"]["score"]
+            with (out / json_name).open("w", encoding="utf-8") as handle:
+                json.dump(
+                    {
+                        "patch_id": patch_id,
+                        "candidate_description": candidate.get("description", ""),
+                        "event": event,
+                        "split": "benign_challenge",
+                        "benign_intervention_rate": benign_score["benign_intervention_rate"],
+                        "benign_utility_penalty": benign_score["utility_penalty"],
+                        "window_start_time_s": window[0]["time_s"] if window else None,
+                        "window_end_time_s": window[-1]["time_s"] if window else None,
+                        "rows": window,
+                    },
+                    handle,
+                    indent=2,
+                )
+            _write_svg_plot(window, out / svg_name, title=f"{patch_id}: {run_id}")
+            examples.append(
+                {
+                    "patch_id": patch_id,
+                    "event_type": event["property_id"],
+                    "split": "benign_challenge",
+                    "run_id": run_id,
+                    "scenario_id": event["scenario_id"],
+                    "scenario_type": event["scenario_type"],
+                    "time_s": event["time_s"],
+                    "row_index": event["row_index"],
+                    "window_start_time_s": window[0]["time_s"] if window else None,
+                    "window_end_time_s": window[-1]["time_s"] if window else None,
+                    "benign_intervention_rate": benign_score["benign_intervention_rate"],
+                    "benign_utility_penalty": benign_score["utility_penalty"],
+                    "csv": csv_name,
+                    "json": json_name,
+                    "plot": svg_name,
+                }
+            )
+            if candidate_examples >= 2:
+                break
+    return examples
+
+
+def _candidate_by_patch_id(
+    ranked: list[dict[str, Any]],
+    patch_id: str,
+) -> dict[str, Any] | None:
+    for candidate in ranked:
+        if candidate["patch_id"] == patch_id:
+            return candidate
+    return None
 
 
 def _first_benign_intervention_event(run_rows: list[dict]) -> dict[str, Any] | None:
@@ -502,7 +591,8 @@ def _write_index(
     train_improvement_pct: float,
     holdout_improvement_pct: float,
     top_failures: list[dict[str, Any]],
-    top_benign_false_positives: list[dict[str, Any]],
+    selected_patch_false_positives: list[dict[str, Any]],
+    rejected_false_positives: list[dict[str, Any]],
 ) -> None:
     baseline_train = baseline_results["train"]
     baseline_holdout = baseline_results["holdout"]
@@ -513,6 +603,8 @@ def _write_index(
         "**This demo validates the repair loop, not vehicle safety.**",
         "",
         "This is a SIL-first toy simulator report with formal-tool-compatible invariant checks.",
+        "",
+        "Some dangerous collisions persist even after MRM because the toy low-level braking model cannot avoid all severe cut-ins. This demo evaluates supervisor repair selection, not physical controller feasibility.",
         "",
         "## Dangerous Scenario Performance",
         "",
@@ -601,6 +693,36 @@ def _write_index(
                 "- Unused optional states: "
                 f"{best['invariant_check']['unused_optional_states']}"
             )
+        lines.extend(
+            [
+                "",
+                "## Why the Selected Patch Won",
+                "",
+                f"- `{best['patch_id']}` is not the most aggressive dangerous-scenario patch.",
+                f"- It won because it preserved a {benign['benign_intervention_rate']:.2%} benign intervention rate while retaining a {holdout_improvement_pct:.2f}% dangerous holdout improvement.",
+                "- The selection criterion penalizes benign false positives, so lower dangerous holdout score alone is not sufficient.",
+            ]
+        )
+        for patch_id in (
+            "candidate_ttc_2_5",
+            "candidate_full_mvp_repair",
+            "candidate_combined_ttc_sensor",
+        ):
+            rejected = _candidate_by_patch_id(ranked, patch_id)
+            if not rejected:
+                continue
+            rejected_holdout = rejected["split_results"]["holdout"]["score"]
+            rejected_benign = rejected["split_results"]["benign_challenge"]["score"]
+            rejected_improvement = _improvement_pct(
+                baseline_holdout["score"]["total_score"],
+                rejected_holdout["total_score"],
+            )
+            lines.append(
+                f"- `{patch_id}` improved dangerous holdout by {rejected_improvement:.2f}% "
+                f"(total {rejected_holdout['total_score']}) but produced "
+                f"{rejected_benign['benign_intervention_rate']:.2%} benign interventions "
+                f"({rejected_benign['benign_intervention_runs']} runs), so it was rejected as overconservative."
+            )
 
     lines.extend(
         [
@@ -629,9 +751,9 @@ def _write_index(
             f"[plot]({failure['plot']})"
         )
 
-    lines.extend(["", "## Top Benign False-Positive Examples", ""])
-    if top_benign_false_positives:
-        for example in top_benign_false_positives:
+    lines.extend(["", "## Top Selected-Patch Benign False-Positive Examples", ""])
+    if selected_patch_false_positives:
+        for example in selected_patch_false_positives:
             lines.append(
                 f"- `{example['event_type']}` in `{example['scenario_type']}` at "
                 f"t={example['time_s']}s, minimized to {example['window_start_time_s']}s-"
@@ -639,7 +761,26 @@ def _write_index(
                 f"[plot]({example['plot']})"
             )
     else:
-        lines.append("- None for the selected patch.")
+        lines.append(
+            "- None for the selected patch. The export directory is "
+            "`selected_patch_benign_false_positives/` and is intentionally empty when no selected-patch benign false positives are found."
+        )
+
+    lines.extend(["", "## Rejected Fake-Safety Examples", ""])
+    if rejected_false_positives:
+        lines.append(
+            "These are benign-challenge interventions from non-selected candidates that looked safer on some dangerous cases but overfired in safe contexts."
+        )
+        lines.append("")
+        for example in rejected_false_positives:
+            lines.append(
+                f"- `{example['patch_id']}`: `{example['event_type']}` in "
+                f"`{example['scenario_type']}` at t={example['time_s']}s "
+                f"(benign intervention rate {example['benign_intervention_rate']:.2%}): "
+                f"[{example['csv']}]({example['csv']}), [plot]({example['plot']})"
+            )
+    else:
+        lines.append("- No rejected-candidate benign false-positive examples were found.")
 
     lines.extend(["", "## Runtime Properties", ""])
     for property_id, description in PROPERTY_DESCRIPTIONS.items():
@@ -651,6 +792,7 @@ def _write_index(
             "## Limitations",
             "",
             "- The MVP remains a deterministic SIL-first toy simulator, not CARLA.",
+            "- Some dangerous collisions persist after MRM because the toy low-level braking model cannot avoid all severe cut-ins; this is not evidence about physical controller feasibility.",
             "- CARLA, RTAMT, and nuXmv remain optional future adapter/export paths, not required dependencies.",
             "- Utility metrics are proxy measures intended for repair ranking, not validated vehicle comfort or mission KPIs.",
         ]

@@ -130,7 +130,12 @@ def test_report_generation_outputs_required_v02_artifacts(tmp_path, baseline_con
     assert any((tmp_path / "failure_examples").iterdir())
     assert any((tmp_path / "minimized_counterexamples").iterdir())
     assert any((tmp_path / "trace_plots").iterdir())
+    assert (tmp_path / "selected_patch_benign_false_positives").exists()
+    assert (tmp_path / "rejected_candidate_false_positives").exists()
+    assert not (tmp_path / "benign_false_positives").exists()
     summary = json.loads((tmp_path / "summary.json").read_text(encoding="utf-8"))
     assert summary["best_candidate"]["patch_id"] == "candidate"
     assert summary["baseline"]["benign_challenge"]["score"]["utility_penalty"] == 10
     assert summary["top_minimized_counterexamples"][0]["window_start_time_s"] == 0.0
+    assert summary["selected_patch_benign_false_positive_examples"] == []
+    assert summary["rejected_candidate_false_positive_examples"] == []
