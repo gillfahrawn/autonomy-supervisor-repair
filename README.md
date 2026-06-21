@@ -4,6 +4,10 @@ A SIL-first prototype that generates failed driving traces, proposes bounded sup
 
 **This demo validates the repair loop, not vehicle safety.** It is not CARLA, not production ADAS validation, and not evidence of physical controller feasibility.
 
+## Why This Matters
+
+Naive repair loops can appear safer by becoming overconservative: brake earlier, enter minimum-risk maneuver more often, or request takeover in contexts that are actually benign. This demo adds benign challenge scenarios so patches that overfire in safe close-following, confidence-blip, safe cut-in, and high-TTC cruising contexts are penalized. The result validates the repair-selection loop against fake-safety behavior in a toy setting; it does not validate vehicle safety.
+
 ## Quickstart
 
 ```bash
@@ -12,6 +16,16 @@ make demo
 ```
 
 `make demo` regenerates scenarios, traces, candidate patches, verification outputs, and the latest report under `reports/latest/`. That directory is gitignored generated output; the committed v0.3 artifact snapshot linked below lives under `docs/demo_artifacts/v0.3/`.
+
+## Repository Setup
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+python3 -m pytest
+make demo
+```
 
 ## Current Demo Result
 
